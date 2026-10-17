@@ -1,0 +1,81 @@
+# SecurePi kas build manifest (Yocto Scarthgap 5.0 LTS)
+#
+#   kas checkout kas.yml   # clone upstream layers (e.g. for browsing)
+#   kas build kas.yml      # clone layers + build securepi-image
+#
+# This file pins every upstream layer; it is the source of truth for versions.
+
+header:
+  version: 14
+
+machine: raspberrypi5
+distro: securepi
+target: securepi-image
+
+repos:
+  # Core Yocto build system and base layer set
+  # Provides: meta (base recipes), meta-poky (distro policy baseline)
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: scarthgap
+    path: yocto/poky
+    layers:
+      meta:
+      meta-poky:
+
+  # Raspberry Pi 5 Board Support Package
+  # Provides: machine config, GPU firmware, kernel patches, bootloader config
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi
+    branch: scarthgap
+    path: yocto/layers/meta-raspberrypi
+
+  # The SecurePi layer, kept in this repository (not cloned by kas)
+  meta-securepi:
+    path: yocto/layers/meta-securepi
+
+# meta-openembedded
+# Provides: extended package set (chrony, audit, aide, etc.)
+#   meta-openembedded:
+#     url: https://github.com/openembedded/meta-openembedded
+#     branch: scarthgap
+#     path: yocto/layers/meta-openembedded
+#     layers:
+#       meta-oe:
+#       meta-python:
+#       meta-networking:
+#       meta-filesystems:
+#
+# meta-selinux, meta-security
+# Provides: SELinux policy framework, security tooling (checksec, aide, etc.)
+#   meta-selinux:
+#     url: https://github.com/SELinuxProject/meta-selinux
+#     branch: scarthgap
+#     path: yocto/layers/meta-selinux
+#     layers:
+#       meta-selinux:
+#   meta-security:
+#     url: https://git.yoctoproject.org/meta-security
+#     branch: scarthgap
+#     path: yocto/layers/meta-security
+#     layers:
+#       meta-security:
+#
+# Planned: meta-arm
+# Provides: ARM Trusted Firmware-A (TF-A), OP-TEE trusted execution environment
+#   meta-arm:
+#     url: https://git.yoctoproject.org/meta-arm
+#     branch: scarthgap
+#     path: yocto/layers/meta-arm
+#     layers:
+#       meta-arm:
+#       meta-arm-toolchain:
+#
+# Planned: meta-rauc
+# Provides: RAUC OTA update framework
+#   meta-rauc:
+#     url: https://github.com/rauc/meta-rauc
+#     branch: scarthgap
+#     path: yocto/layers/meta-rauc
+#     layers:
+#       meta-rauc:
