@@ -1,0 +1,17 @@
+# kas: build directory and fetched upstream layers
+/build/
+/yocto/poky/
+/yocto/layers/*
+!/yocto/layers/meta-securepi/
+
+# Keys: only the public certificates are committed
+/keys/**
+!/keys/**/
+!/keys/**/*.crt
+*.key
+*.pem
+
+# Hidden files (editor, OS and tool files), except these
+.*
+!/.gitignore
+!/.github/
