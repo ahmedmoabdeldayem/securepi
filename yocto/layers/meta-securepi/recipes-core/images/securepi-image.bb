@@ -29,6 +29,7 @@ IMAGE_FEATURES:remove = "debug-tweaks allow-root-login post-install-logging"
 IMAGE_INSTALL:append = " \
     openssh \
     openssh-sftp-server \
+    securepi-banner \
 "
 
 # Disable root SSH login: use a dedicated user
