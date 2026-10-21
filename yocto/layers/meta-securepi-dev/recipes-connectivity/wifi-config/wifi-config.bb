@@ -1,5 +1,5 @@
-# TEMPORARY: Pre-Debug Probe SSH access over Wi-Fi.
-# Revert this commit once the Debug Probe arrives.
+# Dev-only: Wi-Fi credentials, serial console user, and networking config.
+# SSH disabled: serial console via Debug Probe is the access method.
 
 SUMMARY = "Temporary Wi-Fi credentials and networking config"
 LICENSE = "MIT"
@@ -17,7 +17,7 @@ S = "${WORKDIR}"
 inherit useradd
 
 USERADD_PACKAGES = "${PN}"
-USERADD_PARAM:${PN} = "-M -d /home/securepi -s /bin/sh -u 1000 securepi"
+USERADD_PARAM:${PN} = "-M -d /home/securepi -s /bin/sh -u 1000 -p '\$6\$uU2.uEWhNmTHC/LL\$DsFzAJ/oPkwV7whTYe5boD0544Nou32My8sBsWNEVylrF1prt9Xy5jkqgcBMCecI85mVm/c9WRbndPQ7rS1Np.' securepi"
 
 RDEPENDS:${PN} = "wpa-supplicant linux-firmware-rpidistro-bcm43455"
 
@@ -43,7 +43,7 @@ do_install() {
     ln -sf ${systemd_unitdir}/system/systemd-networkd.service \
         ${D}${sysconfdir}/systemd/system/multi-user.target.wants/systemd-networkd.service
 
-    # Enable SSH socket: sshd.socket belongs to sockets.target, not multi-user.target
+    # SSH socket: activates sshd on incoming connections
     install -d ${D}${sysconfdir}/systemd/system/sockets.target.wants
     ln -sf ${systemd_unitdir}/system/sshd.socket \
         ${D}${sysconfdir}/systemd/system/sockets.target.wants/sshd.socket

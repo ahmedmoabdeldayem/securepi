@@ -10,8 +10,13 @@ SUMMARY = "Hardened embedded Linux image for the Raspberry Pi 5"
 IMAGE_FEATURES:remove = "debug-tweaks allow-root-login post-install-logging"
 
 # ── System hardening ──
-IMAGE_INSTALL:append = " sysctl-hardened"
+IMAGE_INSTALL:append = " sysctl-hardened sudo"
 IMAGE_FEATURES:append = " read-only-rootfs"
+
+inherit extrausers
+EXTRA_USERS_PARAMS = "useradd -M -d /home/securepi -s /bin/sh -u 1000 \
+    -p '\$6\$uU2.uEWhNmTHC/LL\$DsFzAJ/oPkwV7whTYe5boD0544Nou32My8sBsWNEVylrF1prt9Xy5jkqgcBMCecI85mVm/c9WRbndPQ7rS1Np.' \
+    securepi;"
 
 # ── Planned: MAC Policies ──
 # IMAGE_INSTALL:append = " packagegroup-core-selinux securepi-selinux-policy"
@@ -26,12 +31,4 @@ IMAGE_FEATURES:append = " read-only-rootfs"
 # Planned: OTA updates + network hardening
 # IMAGE_INSTALL:append = " rauc nftables auditd aide"
 
-# Always include these minimal security tools
-IMAGE_INSTALL:append = " \
-    openssh \
-    openssh-sftp-server \
-    securepi-banner \
-"
-
-# Disable root SSH login: use a dedicated user
-# (configured via recipes-core/base-files bbappend)
+IMAGE_INSTALL:append = " securepi-banner"

@@ -34,11 +34,10 @@ repos:
   meta-securepi:
     path: yocto/layers/meta-securepi
 
-  # Development-only layer: Wi-Fi credentials, SSH key, debug tooling.
-  # Uncomment the two lines below when you need SSH access to the Pi.
-  # Comment them out again when studying or building for production.
-  meta-securepi-dev:
-    path: yocto/layers/meta-securepi-dev
+  # Development-only layer: originally for SSH access before Debug Probe arrived.
+  # Disabled: Debug Probe is now the access method. Re-enable only if needed.
+  # meta-securepi-dev:
+  #   path: yocto/layers/meta-securepi-dev
 
 # meta-openembedded
 # Provides: extended package set (chrony, audit, aide, etc.)
