@@ -1,0 +1,11 @@
+[Unit]
+Description=Boot debug logging to /boot/debug.log
+After=wpa_supplicant@wlan0.service systemd-networkd.service sshd.socket
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/debug-boot.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
