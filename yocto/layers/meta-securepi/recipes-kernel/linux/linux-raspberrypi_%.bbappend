@@ -4,5 +4,4 @@
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-# Uncomment when the config fragment exists
-# SRC_URI:append = " file://securepi-hardening.cfg"
+SRC_URI:append = " file://securepi-hardening.cfg"
