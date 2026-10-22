@@ -1,0 +1,7 @@
+# SecurePi file contexts
+# Maps filesystem paths to SELinux labels.
+# Format: <path regex>  <type>  <label>
+#
+# Populated after first-boot audit: leave empty until then.
+# Example (do not enable until the type exists in securepi.te):
+#   /usr/bin/securepi-tool  --  system_u:object_r:securepi_exec_t:s0

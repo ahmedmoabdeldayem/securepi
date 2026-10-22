@@ -1,0 +1,6 @@
+## <summary>SecurePi custom policy interfaces</summary>
+## <desc>
+##   Public interface macros for the securepi policy module.
+##   Other modules use these to interact with securepi-typed processes and files.
+##   Populated as the policy grows.
+## </desc>
