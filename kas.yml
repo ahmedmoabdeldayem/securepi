@@ -40,31 +40,27 @@ repos:
   #   path: yocto/layers/meta-securepi-dev
 
 # meta-openembedded
-# Provides: extended package set (chrony, audit, aide, etc.)
-#   meta-openembedded:
-#     url: https://github.com/openembedded/meta-openembedded
-#     branch: scarthgap
-#     path: yocto/layers/meta-openembedded
-#     layers:
-#       meta-oe:
-#       meta-python:
-#       meta-networking:
-#       meta-filesystems:
-#
+# Provides: extended package set required by meta-selinux and meta-security
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded
+    branch: scarthgap
+    path: yocto/layers/meta-openembedded
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+      meta-filesystems:
+
 # meta-selinux, meta-security
 # Provides: SELinux policy framework, security tooling (checksec, aide, etc.)
-#   meta-selinux:
-#     url: https://github.com/SELinuxProject/meta-selinux
-#     branch: scarthgap
-#     path: yocto/layers/meta-selinux
-#     layers:
-#       meta-selinux:
-#   meta-security:
-#     url: https://git.yoctoproject.org/meta-security
-#     branch: scarthgap
-#     path: yocto/layers/meta-security
-#     layers:
-#       meta-security:
+  meta-selinux:
+    url: https://git.yoctoproject.org/meta-selinux
+    branch: scarthgap
+    path: yocto/layers/meta-selinux
+  meta-security:
+    url: https://git.yoctoproject.org/meta-security
+    branch: scarthgap
+    path: yocto/layers/meta-security
 #
 # Planned: meta-arm
 # Provides: ARM Trusted Firmware-A (TF-A), OP-TEE trusted execution environment
