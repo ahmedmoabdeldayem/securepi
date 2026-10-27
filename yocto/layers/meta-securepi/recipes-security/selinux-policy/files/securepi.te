@@ -1,15 +1,17 @@
-policy_module(securepi, 1.0.0)
+module securepi 1.0.1;
+
+# Types and classes defined in refpolicy that this module references.
+# Any type/class not defined in THIS module must be declared here.
+require {
+    type kernel_t;
+    class capability2 { audit_read };
+}
 
 ########################################
-# SecurePi custom SELinux policy
+# kernel_t: early-boot systemd
 #
-# This file is populated from first-boot AVC denials using audit2allow.
-# Workflow:
-#   1. Boot in permissive mode (DEFAULT_ENFORCING = "permissive" in securepi.conf)
-#   2. Collect denials: dmesg | grep "avc:" > /tmp/avc.log
-#   3. Run on Pi: audit2allow -i /tmp/avc.log -m securepi >> securepi.te
-#   4. Rebuild image with this file updated, test in enforcing mode
-#
-# The module declaration above is required: without it checkmodule rejects the file.
-# Rules go below as they are derived from the audit log.
+# systemd starts as kernel_t before SELinux transitions it to init_t.
+# During that window it reads the audit log: capability 37 (CAP_AUDIT_READ),
+# which lives in the capability2 class (caps 32-63).
 ########################################
+allow kernel_t self:capability2 audit_read;

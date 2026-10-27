@@ -21,8 +21,8 @@ EXTRA_USERS_PARAMS = "useradd -M -d /home/securepi -s /bin/sh -u 1000 \
 # ── SELinux (mandatory access control) ──
 # Base refpolicy + SELinux tooling
 IMAGE_INSTALL:append = " packagegroup-core-selinux"
-# custom policy module: uncomment after writing policy from audit log
-# IMAGE_INSTALL:append = " securepi-selinux-policy"
+# Custom policy module (securepi.te)
+IMAGE_INSTALL:append = " securepi-selinux-policy"
 
 # ── Planned: Secure Storage ──
 # IMAGE_INSTALL:append = " cryptsetup tpm2-tools tpm2-abrmd"
