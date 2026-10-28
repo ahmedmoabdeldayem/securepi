@@ -13,6 +13,9 @@ S = "${WORKDIR}"
 
 DEPENDS = "checkpolicy-native semodule-utils-native"
 
+# Module loading is handled by ROOTFS_POSTPROCESS_COMMAND in securepi-image.bb,
+# which runs after all packages are installed and before setfiles labels the rootfs.
+
 do_compile() {
     checkmodule -M -m -o securepi.mod securepi.te
     semodule_package -o securepi.pp -m securepi.mod -f securepi.fc

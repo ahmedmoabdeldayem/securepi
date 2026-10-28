@@ -1,7 +1,8 @@
-# SecurePi file contexts
-# Maps filesystem paths to SELinux labels.
-# Format: <path regex>  <type>  <label>
-#
-# Populated after first-boot audit: leave empty until then.
-# Example (do not enable until the type exists in securepi.te):
-#   /usr/bin/securepi-tool  --  system_u:object_r:securepi_exec_t:s0
+# securepi-logger file contexts
+# setfiles uses these at image creation time to stamp labels onto files.
+# Each entry maps a path regex to an SELinux label.
+# -- means regular file only (not directories or symlinks).
+
+/usr/bin/securepi-logger        --      system_u:object_r:securepi_logger_exec_t:s0
+/etc/securepi-logger\.conf      --      system_u:object_r:securepi_logger_conf_t:s0
+/run/securepi-logger\.log       --      system_u:object_r:securepi_logger_log_t:s0
