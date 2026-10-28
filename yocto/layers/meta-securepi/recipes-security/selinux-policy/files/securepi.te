@@ -1,0 +1,50 @@
+module securepi 1.2.0;
+
+require {
+    type kernel_t;
+    type init_t;
+    role system_r;
+    attribute domain;
+    attribute daemon;
+    class capability2 { audit_read };
+    class file { execute entrypoint read open getattr };
+    class process { transition };
+}
+
+########################################
+# kernel_t: early-boot systemd
+#
+# systemd starts as kernel_t before SELinux transitions it to init_t.
+# During that window it reads the audit log: CAP_AUDIT_READ (cap 37),
+# which lives in capability2 (caps 32-63).
+########################################
+allow kernel_t self:capability2 audit_read;
+
+########################################
+# securepi-logger: confined telemetry service
+#
+# Intentionally minimal: only the domain transition is defined here.
+# All other permissions are derived from the AVC denial log after first boot
+# in permissive mode, then added below.
+########################################
+type securepi_logger_t;
+type securepi_logger_exec_t;
+type securepi_logger_conf_t;
+type securepi_logger_log_t;
+
+# securepi_logger_t must be in the 'domain' attribute or the refpolicy neverallow
+# "neverallow * ~domain:process { transition }" rejects our transition rule.
+# It must be in 'daemon' or "neverallow init_t ~daemon:process { transition }"
+# rejects init_t starting it.
+typeattribute securepi_logger_t domain;
+typeattribute securepi_logger_t daemon;
+
+role system_r types securepi_logger_t;
+
+# Entry point: the binary is the gate into this domain
+allow securepi_logger_t securepi_logger_exec_t:file entrypoint;
+
+# init_t executes the binary and transitions into securepi_logger_t
+allow init_t securepi_logger_exec_t:file { execute read open getattr };
+allow init_t securepi_logger_t:process transition;
+type_transition init_t securepi_logger_exec_t:process securepi_logger_t;

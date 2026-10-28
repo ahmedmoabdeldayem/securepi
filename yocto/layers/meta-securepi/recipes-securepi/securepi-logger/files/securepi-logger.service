@@ -1,0 +1,14 @@
+[Unit]
+Description=SecurePi telemetry logger
+After=local-fs.target
+
+[Service]
+Type=simple
+User=securepi
+Group=securepi
+ExecStart=/usr/bin/securepi-logger
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
