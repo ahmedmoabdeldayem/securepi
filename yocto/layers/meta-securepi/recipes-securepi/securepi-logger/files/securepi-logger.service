@@ -9,6 +9,8 @@ Group=securepi
 ExecStart=/usr/bin/securepi-logger
 Restart=on-failure
 RestartSec=5
+RuntimeDirectory=securepi-logger
+RuntimeDirectoryMode=0700
 
 [Install]
 WantedBy=multi-user.target

@@ -1,17 +1,26 @@
-module securepi 1.3.0;
+module securepi 1.9.0;
 
 require {
     type kernel_t;
     type init_t;
     type mount_t;
     type var_spool_t;
+    type lib_t;
+    type ld_so_t;
+    type ld_so_cache_t;
+    type proc_t;
+    type var_run_t;
+    type tmpfs_t;
     role system_r;
     attribute domain;
     attribute daemon;
     class capability2 { audit_read };
-    class file { execute entrypoint read open getattr };
-    class dir mounton;
+    class file { execute entrypoint read open getattr map lock ioctl write create append };
+    class dir { mounton search write add_name };
     class process { transition };
+    class lnk_file { read getattr };
+    class fd { use };
+    class filesystem { associate };
 }
 
 ########################################
@@ -51,7 +60,44 @@ role system_r types securepi_logger_t;
 # Entry point: the binary is the gate into this domain
 allow securepi_logger_t securepi_logger_exec_t:file entrypoint;
 
+# After the domain transition the dynamic linker needs to read and map the
+# binary's own code sections. Without these the linker silently fails and the
+# process crashes with SIGSEGV. These mirror refpolicy's domain_entry_file().
+allow securepi_logger_t securepi_logger_exec_t:file { read open getattr execute map lock ioctl };
+
+# The 'domain' attribute provides execute/read/open/getattr on lib_t and ld_so_t
+# but NOT map. 'map' was added as a separate SELinux permission in kernel 4.18+
+# and refpolicy's domain attribute was never updated for it. Without map,
+# mmap(PROT_EXEC) is silently denied (dontaudit suppresses the AVC), crashing
+# the dynamic linker with SIGSEGV before main() is reached.
+allow securepi_logger_t lib_t:file map;
+allow securepi_logger_t lib_t:dir search;
+allow securepi_logger_t lib_t:lnk_file { read getattr };
+allow securepi_logger_t ld_so_t:file map;
+allow securepi_logger_t ld_so_cache_t:file map;
+
+# Config file: /etc/securepi-logger.conf (labeled securepi_logger_conf_t by setfiles)
+allow securepi_logger_t securepi_logger_conf_t:file { read open getattr };
+
+# /proc/uptime is proc_t; 'domain' may not cover all proc reads for confined daemons
+allow securepi_logger_t proc_t:file { read open getattr };
+
+# Log file in /run/: /run is a tmpfs so setfiles never labels it at build time.
+# type_transition labels newly created files so the write rules below actually match.
+allow securepi_logger_t var_run_t:dir { search write add_name };
+allow securepi_logger_t securepi_logger_log_t:file { create write open append getattr };
+type_transition securepi_logger_t var_run_t:file securepi_logger_log_t "securepi-logger.log";
+# securepi_logger_log_t files live on /run/ which is tmpfs_t; without this
+# the kernel rejects file creation with EACCES (filesystem:associate check).
+allow securepi_logger_log_t tmpfs_t:filesystem associate;
+
 # init_t executes the binary and transitions into securepi_logger_t
 allow init_t securepi_logger_exec_t:file { execute read open getattr };
 allow init_t securepi_logger_t:process transition;
 type_transition init_t securepi_logger_exec_t:process securepi_logger_t;
+
+# After domain transition, the new process inherits open FDs from systemd (init_t).
+# The dynamic linker reads the binary through the inherited exec-fd, and systemd
+# passes stdin/stdout/stderr and its notification socket. Without fd:use, every
+# operation on those inherited FDs fails with EACCES → SIGSEGV in the dynamic linker.
+allow securepi_logger_t init_t:fd use;

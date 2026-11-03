@@ -64,8 +64,8 @@ selinux_load_modules() {
         MOD_NAME=$(basename "$pp" .pp)
         MOD_DIR="$STORE/$MOD_NAME"
         mkdir -p "$MOD_DIR"
-        printf '%s' 'pp' > "$MOD_DIR/lang_ext"
-        "$HLL_BIN" "$pp" | bzip2 --stdout > "$MOD_DIR/cil" \
+        printf '%s' 'cil' > "$MOD_DIR/lang_ext"
+        "$HLL_BIN" "$pp" > "$MOD_DIR/cil" \
             || { echo "WARNING: HLL conversion failed for $pp"; continue; }
         cp "$pp" "$MOD_DIR/hll"
         echo "Added module to store: $MOD_NAME"
