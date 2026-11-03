@@ -8,6 +8,9 @@ require recipes-core/images/core-image-minimal.bb
 # Falls back to /.autorelabel (first-boot relabel) if setfiles fails.
 inherit selinux-image
 
+# Use our own wks file so we can set --no-fstab-update on the rootfs partition.
+WKS_FILE = "securepi.wks"
+
 SUMMARY = "Hardened embedded Linux image for the Raspberry Pi 5"
 
 # ── Baseline: drop everything we don't need ──
@@ -61,8 +64,8 @@ selinux_load_modules() {
         MOD_NAME=$(basename "$pp" .pp)
         MOD_DIR="$STORE/$MOD_NAME"
         mkdir -p "$MOD_DIR"
-        printf '%s' 'pp' > "$MOD_DIR/lang_ext"
-        "$HLL_BIN" "$pp" | bzip2 --stdout > "$MOD_DIR/cil" \
+        printf '%s' 'cil' > "$MOD_DIR/lang_ext"
+        "$HLL_BIN" "$pp" > "$MOD_DIR/cil" \
             || { echo "WARNING: HLL conversion failed for $pp"; continue; }
         cp "$pp" "$MOD_DIR/hll"
         echo "Added module to store: $MOD_NAME"
@@ -107,3 +110,19 @@ ROOTFS_POSTPROCESS_COMMAND += "selinux_load_modules; "
 # IMAGE_INSTALL:append = " rauc nftables auditd aide"
 
 IMAGE_INSTALL:append = " securepi-banner"
+
+# /etc/fstab ends up unlabeled after the image build: setfiles appears to run
+# before some late step recreates the file. Use setfattr to stamp the xattr
+# directly; this bypasses the setfiles policy chain entirely.
+# attr-native provides setfattr; do_image dependency makes it available here.
+do_image[depends] += "attr-native:do_populate_sysroot"
+
+selinux_label_fstab() {
+    if [ -f "${IMAGE_ROOTFS}/etc/fstab" ]; then
+        setfattr -n security.selinux \
+            -v "system_u:object_r:etc_t:s0" \
+            "${IMAGE_ROOTFS}/etc/fstab" || \
+            echo "WARNING: setfattr on fstab failed"
+    fi
+}
+IMAGE_PREPROCESS_COMMAND:append = " selinux_label_fstab; "

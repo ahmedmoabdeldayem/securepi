@@ -5,4 +5,4 @@
 
 /usr/bin/securepi-logger        --      system_u:object_r:securepi_logger_exec_t:s0
 /etc/securepi-logger\.conf      --      system_u:object_r:securepi_logger_conf_t:s0
-/run/securepi-logger\.log       --      system_u:object_r:securepi_logger_log_t:s0
+/run/securepi-logger/securepi-logger\.log       --      system_u:object_r:securepi_logger_log_t:s0

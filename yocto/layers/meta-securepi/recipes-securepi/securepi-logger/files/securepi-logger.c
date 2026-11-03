@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #define CONF    "/etc/securepi-logger.conf"
-#define LOGFILE "/run/securepi-logger.log"
+#define LOGFILE "/run/securepi-logger/securepi-logger.log"
 
 int main(void)
 {
