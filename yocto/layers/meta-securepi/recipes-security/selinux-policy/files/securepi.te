@@ -1,4 +1,4 @@
-module securepi 1.9.0;
+module securepi 1.13.0;
 
 require {
     type kernel_t;
@@ -14,9 +14,17 @@ require {
     role system_r;
     attribute domain;
     attribute daemon;
+    type lvm_t;
+    type klogd_t;
+    type syslogd_t;
+    type bpf_t;
+    type removable_device_t;
+    type bin_t;
     class capability2 { audit_read };
     class file { execute entrypoint read open getattr map lock ioctl write create append };
+    class blk_file { getattr read open write ioctl lock };
     class dir { mounton search write add_name };
+    class key { search };
     class process { transition };
     class lnk_file { read getattr };
     class fd { use };
@@ -95,6 +103,28 @@ allow securepi_logger_log_t tmpfs_t:filesystem associate;
 allow init_t securepi_logger_exec_t:file { execute read open getattr };
 allow init_t securepi_logger_t:process transition;
 type_transition init_t securepi_logger_exec_t:process securepi_logger_t;
+
+########################################
+# dm-crypt (cryptsetup / device-mapper)
+#
+# cryptsetup delegates block device setup to device-mapper, which runs as lvm_t.
+# lvm_t needs to write the LUKS header to the SD card partition (removable_device_t),
+# search the BPF filesystem that dm-crypt probes during initialisation, and search
+# init_t's kernel keyring (used by dm-crypt for key retention).
+########################################
+allow lvm_t removable_device_t:blk_file { getattr ioctl lock read open write };
+allow lvm_t bpf_t:dir search;
+allow lvm_t init_t:key search;
+
+########################################
+# System daemon map permission fixes
+#
+# klogd and syslogd need mmap(PROT_EXEC) on binaries in /bin to load shared
+# libraries at startup. Same root cause as securepi_logger_t above:
+# refpolicy's domain attribute provides execute/read on bin_t but not map.
+########################################
+allow klogd_t bin_t:file { read open execute map };
+allow syslogd_t bin_t:file { read open execute map };
 
 # After domain transition, the new process inherits open FDs from systemd (init_t).
 # The dynamic linker reads the binary through the inherited exec-fd, and systemd
