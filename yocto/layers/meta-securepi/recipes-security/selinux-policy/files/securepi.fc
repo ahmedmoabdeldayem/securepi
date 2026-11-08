@@ -6,3 +6,7 @@
 /usr/bin/securepi-logger        --      system_u:object_r:securepi_logger_exec_t:s0
 /etc/securepi-logger\.conf      --      system_u:object_r:securepi_logger_conf_t:s0
 /run/securepi-logger/securepi-logger\.log       --      system_u:object_r:securepi_logger_log_t:s0
+
+# LUKS data partition mount point: labeled var_run_t so confined daemons
+# that read secrets from the encrypted volume get a consistent label.
+/run/securedata(/.*)?                                   system_u:object_r:var_run_t:s0
