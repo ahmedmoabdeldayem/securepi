@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: GPL-2.0
+// Device tree overlay for Infineon SLB967x SPI TPM on Raspberry Pi
+// Compatible with both SLB9670 and SLB9672 (same tpm_tis_spi driver).
+// Used by LetsTrust TPM module on the 40-pin GPIO header.
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			tpm_tis_spi0: tpm@0 {
+				compatible = "tcg,tpm_tis-spi";
+				reg = <0>;
+				spi-max-frequency = <32000000>;
+				interrupt-parent = <&gpio>;
+				interrupts = <25 1>;
+			};
+		};
+	};
+
+	__overrides__ {
+		cs = <&tpm_tis_spi0>, "reg:0";
+		irq_gpio = <&tpm_tis_spi0>, "interrupts:0";
+	};
+};

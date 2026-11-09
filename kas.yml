@@ -61,6 +61,11 @@ repos:
     url: https://git.yoctoproject.org/meta-security
     branch: scarthgap
     path: yocto/layers/meta-security
+  # meta-tpm is a sublayer inside meta-security: no separate clone needed,
+  # referenced as a local path so kas adds it to BBLAYERS without re-cloning.
+  # Provides tpm2-tools, tpm2-tss
+  meta-tpm:
+    path: yocto/layers/meta-security/meta-tpm
 #
 # Planned: meta-arm
 # Provides: ARM Trusted Firmware-A (TF-A), OP-TEE trusted execution environment
