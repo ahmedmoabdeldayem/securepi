@@ -22,3 +22,6 @@ do_deploy:append() {
 }
 
 DEPENDS:append = " dtc-native"
+
+# Load the RP1 SPI (DesignWare MMIO) driver at boot via systemd-modules-load
+KERNEL_MODULE_AUTOLOAD:append = " spi-dw-mmio"

@@ -104,7 +104,7 @@ ROOTFS_POSTPROCESS_COMMAND += "selinux_load_modules; "
 # LUKS + dm-verity tooling
 IMAGE_INSTALL:append = " cryptsetup e2fsprogs-mke2fs"
 # TPM operations
-IMAGE_INSTALL:append = " tpm2-tools tpm2-abrmd"
+IMAGE_INSTALL:append = " tpm2-tools tpm2-abrmd kernel-modules"
 
 # ── Planned: Secure Boot ──
 # IMAGE_INSTALL:append = " optee-client optee-os"
