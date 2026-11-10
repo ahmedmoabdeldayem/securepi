@@ -10,3 +10,11 @@
 # LUKS data partition mount point: labeled var_run_t so confined daemons
 # that read secrets from the encrypted volume get a consistent label.
 /run/securedata(/.*)?                                   system_u:object_r:var_run_t:s0
+
+# TPM character devices: created at boot by tpm_tis_spi when the chip probes.
+# /dev/tpm0    = direct access (one process at a time, no multiplexing)
+# /dev/tpmrm0  = in-kernel resource manager (kernel 4.20+, multiplexed access)
+# tpm_device_t is defined in refpolicy; explicit entries here ensure labeling
+# even if the refpolicy file_contexts are missing or outdated.
+/dev/tpm[0-9]+                  -c      system_u:object_r:tpm_device_t:s0
+/dev/tpmrm[0-9]+                -c      system_u:object_r:tpm_device_t:s0
