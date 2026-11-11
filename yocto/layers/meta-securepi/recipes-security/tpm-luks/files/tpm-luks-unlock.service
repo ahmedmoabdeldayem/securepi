@@ -1,0 +1,18 @@
+[Unit]
+Description=TPM2 LUKS Auto-Unlock (securedata)
+DefaultDependencies=no
+After=dev-tpmrm0.device dev-mmcblk0p3.device
+Requires=dev-tpmrm0.device dev-mmcblk0p3.device
+Before=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/securepi/tpm-luks-unlock.sh
+ExecStop=/bin/umount /run/securedata
+ExecStop=/usr/sbin/cryptsetup luksClose securedata
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=local-fs.target
