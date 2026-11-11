@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: GPL-2.0
+// Device tree overlay for LetsTrust TPM (Infineon SLB9670) on Raspberry Pi 5.
+// Based on the official RPi kernel tpm-slb9670-overlay.dts.
+//
+// The LetsTrust module wires CS to CE1 (GPIO7, physical pin 26), not CE0, so the
+// TPM node uses reg = <1>.
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2712";
+
+	fragment@0 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@1 {
+		target = <&spidev1>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@2 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			slb9670: slb9670@1 {
+				compatible = "infineon,slb9670";
+				reg = <1>;	/* CE1 = GPIO7 = physical pin 26 */
+				#address-cells = <1>;
+				#size-cells = <0>;
+				spi-max-frequency = <32000000>;
+				status = "okay";
+			};
+		};
+	};
+};
