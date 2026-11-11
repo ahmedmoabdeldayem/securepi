@@ -54,9 +54,22 @@ if [ -d "$mountpoint" ]; then
             mountcontext=",rootcontext=$(matchpathcon -n "$mountpoint")"
         fi
     fi
-    # rw is explicit: kernel 6.6+ marks overlayfs ro when lower dir is on a
-    # read-only filesystem unless rw is passed explicitly in the options.
-    if [ "$MOUNT_COPYBIND_AVOID_OVERLAYFS" = 1 ] || ! mount -t overlay overlay -orw,lowerdir="$mountpoint",upperdir="$spec",workdir="$overlay_workdir""$mountcontext" "$mountpoint" > /dev/null 2>&1; then
+    # Try overlay. After mounting, test writability: kernel 6.12 marks the
+    # overlay ro when lowerdir is on a ro fs even when rw is requested.
+    # If it mounts ro, unmount and fall back to bind mount below.
+    _overlay_ok=0
+    if [ "$MOUNT_COPYBIND_AVOID_OVERLAYFS" != 1 ]; then
+        if mount -t overlay overlay -orw,lowerdir="$mountpoint",upperdir="$spec",workdir="$overlay_workdir""$mountcontext" "$mountpoint" > /dev/null 2>&1; then
+            if touch "$mountpoint/.ovl-rw-test" 2>/dev/null; then
+                rm -f "$mountpoint/.ovl-rw-test"
+                _overlay_ok=1
+            else
+                umount "$mountpoint" 2>/dev/null
+            fi
+        fi
+    fi
+
+    if [ "$_overlay_ok" = 0 ]; then
 
         if [ "$specdir_existed" != "yes" ]; then
             cp -aPR "$mountpoint"/. "$spec/"
