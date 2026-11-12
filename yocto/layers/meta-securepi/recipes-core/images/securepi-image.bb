@@ -105,6 +105,8 @@ ROOTFS_POSTPROCESS_COMMAND += "selinux_load_modules; "
 IMAGE_INSTALL:append = " cryptsetup e2fsprogs-mke2fs"
 # TPM operations
 IMAGE_INSTALL:append = " tpm2-tools tpm2-abrmd libtss2-tcti-device kernel-modules"
+# TPM-backed LUKS auto-unlock service
+IMAGE_INSTALL:append = " tpm-luks-unlock"
 
 # ── Planned: Secure Boot ──
 # IMAGE_INSTALL:append = " optee-client optee-os"
@@ -129,3 +131,10 @@ selinux_label_fstab() {
     fi
 }
 IMAGE_PREPROCESS_COMMAND:append = " selinux_label_fstab; "
+
+# Append TPM2 TCTI to /etc/environment after pam-plugin-env installs it,
+# so all login shells have it without manually exporting each session.
+append_tpm_tcti() {
+    echo 'TPM2TOOLS_TCTI=device:/dev/tpmrm0' >> ${IMAGE_ROOTFS}/etc/environment
+}
+ROOTFS_POSTPROCESS_COMMAND += "append_tpm_tcti; "

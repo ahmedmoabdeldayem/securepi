@@ -1,9 +1,10 @@
-module securepi 1.15.0;
+module securepi 1.16.0;
 
 require {
     type kernel_t;
     type init_t;
     type mount_t;
+    type initrc_runtime_t;
     type var_spool_t;
     type lib_t;
     type ld_so_t;
@@ -50,6 +51,10 @@ allow kernel_t self:capability2 audit_read;
 # mount_t is denied mounton on var_spool_t when systemd sets up the tmpfs
 # overlay for /var/spool at boot. Refpolicy is missing this specific permission.
 allow mount_t var_spool_t:dir mounton;
+
+# mount_t is denied mounton on /run/securedata (initrc_runtime_t) when the
+# tpm-luks-unlock service mounts the LUKS-decrypted partition at boot.
+allow mount_t initrc_runtime_t:dir mounton;
 
 ########################################
 # securepi-logger: confined telemetry service

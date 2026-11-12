@@ -8,4 +8,5 @@ do_install:append() {
     # to hang indefinitely. DM_DISABLE_UDEV=1 bypasses the semaphore wait.
     install -d ${D}${sysconfdir}/profile.d
     echo 'export DM_DISABLE_UDEV=1' > ${D}${sysconfdir}/profile.d/dm-no-udev.sh
+
 }
