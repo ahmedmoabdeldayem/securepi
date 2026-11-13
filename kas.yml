@@ -66,6 +66,16 @@ repos:
   # Provides tpm2-tools, tpm2-tss
   meta-tpm:
     path: yocto/layers/meta-security/meta-tpm
+
+  # meta-lts-mixins (scarthgap/u-boot branch)
+  # Required for RPi5 (BCM2712) U-Boot support. Scarthgap ships U-Boot 2024.01
+  # which cannot query DRAM size on BCM2712 (mailbox interface changed).
+  # meta-lts-mixins provides U-Boot 2024.07+ with proper BCM2712 support.
+  # meta-raspberrypi commit 6d59364 explicitly requires this layer for RPi5.
+  meta-lts-mixins:
+    url: https://git.yoctoproject.org/meta-lts-mixins
+    branch: scarthgap/u-boot
+    path: yocto/layers/meta-lts-mixins
 #
 # Planned: meta-arm
 # Provides: ARM Trusted Firmware-A (TF-A), OP-TEE trusted execution environment
