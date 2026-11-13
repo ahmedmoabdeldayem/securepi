@@ -1,25 +1,10 @@
-# Kernel configuration hardening for Raspberry Pi 5
-# Applied as a fragment on top of the BSP defconfig.
-# a later stage populates the .cfg file: see files/securepi-hardening.cfg
-
-FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
-
-SRC_URI:append = " file://securepi-hardening.cfg"
-SRC_URI:append = " file://tpm-slb9670.dts"
-
-# Build the TPM overlay using the kernel's own dtc so versions always match.
-# The dtbo lands in DEPLOYDIR/overlays/ which IMAGE_BOOT_FILES picks up for
-# the boot partition via meta-raspberrypi's rpi-default-settings.inc.
-do_compile:append() {
-    ${STAGING_BINDIR_NATIVE}/dtc -I dts -O dtb -@ \
-        ${WORKDIR}/tpm-slb9670.dts \
-        -o ${WORKDIR}/tpm-slb9670.dtbo
-}
-
-do_deploy:append() {
-    install -d ${DEPLOYDIR}/overlays
-    install -m 0644 ${WORKDIR}/tpm-slb9670.dtbo ${DEPLOYDIR}/overlays/tpm-slb9670.dtbo
-}
-
-DEPENDS:append = " dtc-native"
-
+# linux-raspberrypi.inc hardcodes UBOOT_LOADADDRESS = 0x8000 (kernel TEXT_OFFSET).
+# With the FIT image loaded at kernel_addr_r = 0x80000 (U-Boot default for RPi),
+# the uncompressed kernel copy to 0x8000 triggers U-Boot's overlap safety check:
+# "new format image overwritten" because [0x8000, 29.4MB] overlaps [0x80000, 30.5MB].
+#
+# Fix: set load/entry to 0x02000000 (32MB). FIT ends at ~30.5MB < 32MB, so the
+# kernel destination [32MB, 62MB] does not overlap the FIT range [0.5MB, 30.5MB].
+# 32MB is 2MB-aligned as required by the ARM64 boot protocol.
+UBOOT_LOADADDRESS = "0x02000000"
+UBOOT_ENTRYPOINT = "0x02000000"
