@@ -67,6 +67,7 @@ fakeroot do_sign_eeprom() {
         # Read current config from firmware binary and add SIGNED_BOOT=1
         ${PYTHON} "${S}/rpi-eeprom-config" "${FW}" > "${WORKDIR}/bootconf.txt"
         grep -q "^SIGNED_BOOT" "${WORKDIR}/bootconf.txt" || echo "SIGNED_BOOT=1" >> "${WORKDIR}/bootconf.txt"
+        grep -q "^program_pubkey" "${WORKDIR}/bootconf.txt" || echo "program_pubkey=1" >> "${WORKDIR}/bootconf.txt"
 
         # Sign the config file: produces a .sig with SHA256 hash + RSA signature
         "${S}/rpi-eeprom-digest" -k "${KEY}" -i "${WORKDIR}/bootconf.txt" -o "${WORKDIR}/bootconf.sig"
@@ -84,3 +85,24 @@ fakeroot do_sign_eeprom() {
 }
 
 addtask sign_eeprom after do_install before do_package
+
+# Deploy the latest signed EEPROM bin and recovery.bin to DEPLOY_DIR_IMAGE so that
+# securepi-bootimg can include them in boot.img.
+# In SIGNED_BOOT=1 mode the EEPROM reads everything from boot.img (not the outer FAT),
+# so pieeprom.upd must live inside boot.img for EEPROM self-update to work.
+inherit deploy
+
+do_deploy() {
+    LATEST=""
+    for SIGNED in "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/"pieeprom-*-signed.bin; do
+        [ -f "${SIGNED}" ] && LATEST="${SIGNED}"
+    done
+    if [ -n "${LATEST}" ]; then
+        install -m 0644 "${LATEST}" "${DEPLOYDIR}/pieeprom-signed.bin"
+        bbnote "Deployed signed EEPROM to DEPLOYDIR: $(basename ${LATEST})"
+    fi
+    RECOVERY="${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/recovery.bin"
+    [ -f "${RECOVERY}" ] && install -m 0644 "${RECOVERY}" "${DEPLOYDIR}/recovery.bin"
+}
+
+addtask do_deploy after do_sign_eeprom before do_build

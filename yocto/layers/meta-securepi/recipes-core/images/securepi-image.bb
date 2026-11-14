@@ -125,6 +125,7 @@ IMAGE_INSTALL:append = " securepi-banner"
 # attr-native provides setfattr; do_image dependency makes it available here.
 do_image[depends] += "attr-native:do_populate_sysroot"
 do_image_wic[depends] += "tpm-overlay:do_deploy"
+do_image_wic[depends] += "securepi-bootimg:do_deploy"
 
 selinux_label_fstab() {
     if [ -f "${IMAGE_ROOTFS}/etc/fstab" ]; then
