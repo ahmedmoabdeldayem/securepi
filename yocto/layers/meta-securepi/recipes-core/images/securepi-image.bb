@@ -108,7 +108,10 @@ IMAGE_INSTALL:append = " tpm2-tools tpm2-abrmd libtss2-tcti-device kernel-module
 # TPM-backed LUKS auto-unlock service
 IMAGE_INSTALL:append = " tpm-luks-unlock"
 
-# ── Planned: Secure Boot ──
+# ── Secure boot ──
+# EEPROM signing + OTP provisioning tools
+IMAGE_INSTALL:append = " rpi-eeprom raspi-utils"
+# Planned: OP-TEE trusted execution environment (requires meta-arm in kas.yml)
 # IMAGE_INSTALL:append = " optee-client optee-os"
 
 # Planned: OTA updates + network hardening
