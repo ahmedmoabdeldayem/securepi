@@ -57,7 +57,14 @@ do_deploy() {
     # RPi firmware blobs and board config from rpi-bootfiles
     cp "${DEPLOY}/bootfiles/config.txt" "${STAGE}/"
     cp "${DEPLOY}/bootfiles/cmdline.txt" "${STAGE}/" 2>/dev/null || true
-    cp "${DEPLOY}/bootfiles/bootcode.bin" "${STAGE}/" 2>/dev/null || true
+    # Use customer-signed bootcode.bin if available (from rpi-eeprom:do_deploy).
+    # program_pubkey=1 in the EEPROM config triggers OTP burning only after verifying
+    # this signed bootcode on the FAT partition. Falls back to unsigned for non-secure builds.
+    if [ -f "${DEPLOY}/bootcode.bin" ]; then
+        cp "${DEPLOY}/bootcode.bin" "${STAGE}/bootcode.bin"
+    else
+        cp "${DEPLOY}/bootfiles/bootcode.bin" "${STAGE}/bootcode.bin" 2>/dev/null || true
+    fi
     for F in "${DEPLOY}"/bootfiles/start*.elf; do
         [ -f "${F}" ] && cp "${F}" "${STAGE}/"
     done
