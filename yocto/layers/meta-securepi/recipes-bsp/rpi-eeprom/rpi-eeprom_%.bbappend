@@ -58,8 +58,14 @@ fakeroot do_sign_eeprom() {
     # build before we start. Without this, the glob below picks them up and
     # produces double-signed (-signed-signed.bin) files.
     rm -f "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/"*-signed.bin
+    rm -f "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/latest/"*-signed.bin
 
-    for FW in "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/"pieeprom-*.bin; do
+    # Sign both default/ and latest/: latest/ has newer firmware (e.g. 2025-03-19)
+    # which is needed for pieeprom.upd: the EEPROM silently skips same-version updates,
+    # so pieeprom.upd must be NEWER than the currently-running EEPROM firmware.
+    for FW in \
+        "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/"pieeprom-*.bin \
+        "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/latest/"pieeprom-*.bin; do
         [ -f "${FW}" ] || continue
 
         bbnote "Signing EEPROM firmware: $(basename ${FW})"
@@ -93,8 +99,11 @@ addtask sign_eeprom after do_install before do_package
 inherit deploy
 
 do_deploy() {
+    # Pick the newest signed bin across default/ and latest/ (sorted by filename = date)
     LATEST=""
-    for SIGNED in "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/"pieeprom-*-signed.bin; do
+    for SIGNED in \
+        "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/"pieeprom-*-signed.bin \
+        "${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/latest/"pieeprom-*-signed.bin; do
         [ -f "${SIGNED}" ] && LATEST="${SIGNED}"
     done
     if [ -n "${LATEST}" ]; then

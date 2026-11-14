@@ -110,7 +110,7 @@ IMAGE_INSTALL:append = " tpm-luks-unlock"
 
 # ── Secure boot ──
 # EEPROM signing + OTP provisioning tools
-IMAGE_INSTALL:append = " rpi-eeprom raspi-utils"
+IMAGE_INSTALL:append = " rpi-eeprom raspi-utils flashrom"
 # Planned: OP-TEE trusted execution environment (requires meta-arm in kas.yml)
 # IMAGE_INSTALL:append = " optee-client optee-os"
 
