@@ -109,6 +109,13 @@ do_deploy[depends] += " \
 "
 
 do_deploy() {
+    # rpi-eeprom-digest uses xxd for hex encoding: provide the same shim as do_sign_eeprom.
+    mkdir -p "${WORKDIR}/signing-bin"
+    printf '#!/bin/sh\n%s -c "import sys; sys.stdout.write(sys.stdin.buffer.read().hex())" "$@"\n' \
+        "${PYTHON}" > "${WORKDIR}/signing-bin/xxd"
+    chmod +x "${WORKDIR}/signing-bin/xxd"
+    export PATH="${WORKDIR}/signing-bin:${STAGING_BINDIR_NATIVE}:${PATH}"
+
     # Deploy the newest signed EEPROM firmware
     LATEST=""
     for SIGNED in \
@@ -119,16 +126,32 @@ do_deploy() {
     if [ -n "${LATEST}" ]; then
         install -m 0644 "${LATEST}" "${DEPLOYDIR}/pieeprom-signed.bin"
         bbnote "Deployed signed EEPROM to DEPLOYDIR: $(basename ${LATEST})"
+        # Generate pieeprom.sig using rpi-eeprom-digest + customer key.
+        # The EEPROM bootloader (2025+) requires an RSA-signed digest here, not a
+        # plain SHA256. It extracts the customer public key from pieeprom.upd's config
+        # section and verifies this signature before applying the self-update.
+        if [ "${EEPROM_SIGN_ENABLE}" = "1" ]; then
+            KEY="${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key"
+            if [ -f "${KEY}" ]; then
+                "${S}/rpi-eeprom-digest" \
+                    -k "${KEY}" \
+                    -i "${DEPLOYDIR}/pieeprom-signed.bin" \
+                    -o "${DEPLOYDIR}/pieeprom.sig"
+                bbnote "Generated RSA-signed pieeprom.sig with customer key"
+            else
+                bbwarn "Customer key not found: pieeprom.sig not generated, EEPROM self-update will fail"
+            fi
+        fi
     fi
     RECOVERY="${D}${base_libdir}/firmware/raspberrypi/bootloader-2712/default/recovery.bin"
     [ -f "${RECOVERY}" ] && install -m 0644 "${RECOVERY}" "${DEPLOYDIR}/recovery.bin"
 
-    # Deploy customer-signed bootcode.bin for the FAT partition (goes inside boot.img).
-    # program_pubkey=1 in the EEPROM config triggers OTP burning only after the EEPROM
-    # verifies a customer-signed bootcode in the FAT partition at runtime.
-    # The signed bootcode appends: length(4B LE) + keynum(4B LE) + version(4B LE) +
-    # RSA_sig(256B) + pubkey(264B) after the original bootcode bytes, so the BCM2712
-    # can still use it as a secondary bootloader while also verifying the customer sig.
+    # Deploy customer-signed bootcode.bin for the outer FAT and inside boot.img.
+    # The BCM2712 BootROM reads bootcode.bin from the OUTER FAT to verify the customer
+    # RSA signature before honoring program_pubkey=1 and burning OTP. It must be the
+    # signed version (76 KiB) not the stock unsigned version from rpi-bootfiles (52 KiB).
+    # Deployed as bootcode-signed.bin to avoid being overwritten by rpi-bootfiles; the
+    # IMAGE_BOOT_FILES:append in securepi.conf then maps it as bootcode.bin in the FAT.
     if [ "${EEPROM_SIGN_ENABLE}" = "1" ]; then
         KEY="${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key"
         if [ -f "${KEY}" ]; then
@@ -149,8 +172,8 @@ do_deploy() {
                         -k "${KEY}" \
                         -n 16 \
                         -v 0 \
-                        -o "${DEPLOYDIR}/bootcode.bin"
-                    bbnote "Customer-signed bootcode deployed for FAT partition: $(ls -lh ${DEPLOYDIR}/bootcode.bin | awk '{print \$5}')"
+                        -o "${DEPLOYDIR}/bootcode-signed.bin"
+                    bbnote "Customer-signed bootcode deployed for FAT partition: $(ls -lh ${DEPLOYDIR}/bootcode-signed.bin | awk '{print \$5}')"
                 fi
             fi
         fi
