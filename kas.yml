@@ -67,6 +67,16 @@ repos:
   meta-tpm:
     path: yocto/layers/meta-security/meta-tpm
 
+  # usbboot (Raspberry Pi USB boot tool)
+  # Provides: firmware/bootfiles.bin (BCM2712 stage-2 memory init archive)
+  # required by rpiboot when running EEPROM updates. Not a Yocto layer, cloned
+  # so the rpi-eeprom deploy task can include bootfiles.bin in rpiboot-update/.
+  usbboot:
+    url: https://github.com/raspberrypi/usbboot
+    branch: master
+    path: yocto/layers/usbboot
+    layers: {}
+
   # meta-lts-mixins (scarthgap/u-boot branch)
   # Required for RPi5 (BCM2712) U-Boot support. Scarthgap ships U-Boot 2024.01
   # which cannot query DRAM size on BCM2712 (mailbox interface changed).

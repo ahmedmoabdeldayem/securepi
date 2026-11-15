@@ -204,18 +204,69 @@ do_deploy() {
     # config.txt omits program_pubkey because the key hash is already in OTP.
     # Usage: copy rpiboot-update/ to the machine connected to the Pi and run
     # sudo rpiboot -d rpiboot-update
-    if [ -f "${DEPLOYDIR}/bootcode-signed.bin" ] && \
-       [ -f "${DEPLOYDIR}/pieeprom-signed.bin" ] && \
+    if [ -f "${DEPLOYDIR}/pieeprom-signed.bin" ] && \
        [ -f "${DEPLOYDIR}/pieeprom.sig" ]; then
 
         UPDATEDIR="${DEPLOYDIR}/rpiboot-update"
         rm -rf "${UPDATEDIR}"
         mkdir -p "${UPDATEDIR}"
-        install -m 0644 "${DEPLOYDIR}/bootcode-signed.bin" "${UPDATEDIR}/bootcode5.bin"
+
+        # bootcode5.bin for rpiboot must be the RECOVERY bootcode (usbboot/secure-boot-recovery5/),
+        # NOT the EEPROM-embedded bootcode. These are different binaries:
+        # - EEPROM bootcode (76 KiB): embedded in pieeprom.bin, runs the EEPROM bootloader.
+        # - Recovery bootcode (96 KiB): served by rpiboot to BCM2712 BootROM in USB recovery
+        #   mode; boots the EEPROM update ramdisk. Must be signed with customer key after OTP burn.
+        # The recovery bootcode lives in usbboot/rpi-eeprom submodule. Init it if needed.
+        USBBOOT="${TOPDIR}/../yocto/layers/usbboot"
+        RECOVERY_BIN="${USBBOOT}/rpi-eeprom/firmware-2712/latest/recovery.bin"
+        if [ ! -f "${RECOVERY_BIN}" ]; then
+            bbnote "Initialising usbboot rpi-eeprom submodule for recovery bootcode"
+            (cd "${USBBOOT}" && git submodule update --init rpi-eeprom 2>/dev/null) || true
+        fi
+        # secure-boot-recovery5/bootcode5.bin is the customer-counter-signed recovery bootcode.
+        # Must be signed with -r flag (rpi-sign-bootcode on the base recovery.bin).
+        RECOVERY_BOOTCODE="${USBBOOT}/secure-boot-recovery5/bootcode5.bin"
+        if [ ! -f "${RECOVERY_BOOTCODE}" ] && [ -f "${RECOVERY_BIN}" ]; then
+            KEY="${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key"
+            if [ -f "${KEY}" ]; then
+                ${PYTHON} "${S}/tools/rpi-sign-bootcode" \
+                    -c 2712 \
+                    -i "${RECOVERY_BIN}" \
+                    -k "${KEY}" \
+                    -n 16 \
+                    -v 0 \
+                    -o "${RECOVERY_BOOTCODE}"
+            fi
+        fi
+        if [ -f "${RECOVERY_BOOTCODE}" ]; then
+            KEY="${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key"
+            if [ -f "${KEY}" ]; then
+                ${PYTHON} "${S}/tools/rpi-sign-bootcode" \
+                    -c 2712 \
+                    -i "${RECOVERY_BOOTCODE}" \
+                    -k "${KEY}" \
+                    -n 16 \
+                    -v 0 \
+                    -o "${UPDATEDIR}/bootcode5.bin"
+                bbnote "Signed recovery bootcode5.bin for rpiboot-update/"
+            else
+                bbwarn "Customer key not found: rpiboot-update/bootcode5.bin not signed"
+            fi
+        else
+            bbwarn "usbboot/secure-boot-recovery5/bootcode5.bin not found: run: kas checkout kas.yml"
+        fi
+
         install -m 0644 "${DEPLOYDIR}/pieeprom-signed.bin" "${UPDATEDIR}/pieeprom.bin"
         install -m 0644 "${DEPLOYDIR}/pieeprom.sig"        "${UPDATEDIR}/pieeprom.sig"
         printf 'uart_2ndstage=1\n' > "${UPDATEDIR}/config.txt"
-        bbnote "Deployed rpiboot-update/ (BOOT_RAMDISK=1, no program_pubkey) to ${DEPLOYDIR}"
+
+        # NOTE: do NOT include bootfiles.bin in rpiboot-update/.
+        # When bootfiles.bin is present, rpiboot reads bootcode5.bin FROM THE ARCHIVE
+        # (the unsigned 68KB version inside bootfiles.bin) instead of the separate
+        # customer-signed bootcode5.bin file. The BCM2712 OTP lock then rejects it.
+        # EEPROM updates do not need the archive: the BCM2712 handles memory init
+        # internally.
+        bbnote "Deployed rpiboot-update/ (BOOT_RAMDISK=1) to ${DEPLOYDIR}"
     fi
 }
 
