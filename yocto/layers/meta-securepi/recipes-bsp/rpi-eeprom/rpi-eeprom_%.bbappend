@@ -78,9 +78,23 @@ fakeroot do_sign_eeprom() {
         # EEPROM SPI flash binary, changing the BOOTSYS section size and breaking the
         # BCM2712 ROM's own Raspberry Pi signature verification. The customer-signed bootcode
         # goes in boot.img (FAT partition) instead: see securepi-bootimg recipe.
-        ${PYTHON} "${S}/rpi-eeprom-config" "${FW}" > "${WORKDIR}/bootconf.txt"
-        grep -q "^SIGNED_BOOT" "${WORKDIR}/bootconf.txt" || echo "SIGNED_BOOT=1" >> "${WORKDIR}/bootconf.txt"
-        grep -q "^program_pubkey" "${WORKDIR}/bootconf.txt" || echo "program_pubkey=1" >> "${WORKDIR}/bootconf.txt"
+        # Write the full EEPROM config explicitly rather than patching firmware defaults.
+        # Firmware package defaults (e.g. BOOT_ORDER=0xf461, NET_INSTALL_AT_POWER_ON=1)
+        # are unsafe to inherit: we own every field here.
+        #
+        # BOOT_RAMDISK=1: EEPROM always loads boot.img and verifies boot.sig against the
+        # OTP-locked customer key BEFORE mounting it as the boot filesystem. Without this
+        # the EEPROM falls back to individual FAT files and boot.img RSA check is non-fatal.
+        cat > "${WORKDIR}/bootconf.txt" << 'EEPROMCONF'
+[all]
+BOOT_UART=1
+POWER_OFF_ON_HALT=1
+BOOT_ORDER=0xf2461
+ENABLE_SELF_UPDATE=0
+SIGNED_BOOT=1
+program_pubkey=1
+BOOT_RAMDISK=1
+EEPROMCONF
 
         # Sign the config file: produces a .sig with SHA256 hash + RSA signature
         "${S}/rpi-eeprom-digest" -k "${KEY}" -i "${WORKDIR}/bootconf.txt" -o "${WORKDIR}/bootconf.sig"
@@ -182,6 +196,26 @@ do_deploy() {
                 fi
             fi
         fi
+    fi
+
+    # rpiboot-update/: used to reflash the EEPROM SPI flash after OTP is already burned.
+    # This updates the EEPROM config to include BOOT_RAMDISK=1 so the EEPROM enforces
+    # boot.img RSA verification on every boot.
+    # config.txt omits program_pubkey because the key hash is already in OTP.
+    # Usage: copy rpiboot-update/ to the machine connected to the Pi and run
+    # sudo rpiboot -d rpiboot-update
+    if [ -f "${DEPLOYDIR}/bootcode-signed.bin" ] && \
+       [ -f "${DEPLOYDIR}/pieeprom-signed.bin" ] && \
+       [ -f "${DEPLOYDIR}/pieeprom.sig" ]; then
+
+        UPDATEDIR="${DEPLOYDIR}/rpiboot-update"
+        rm -rf "${UPDATEDIR}"
+        mkdir -p "${UPDATEDIR}"
+        install -m 0644 "${DEPLOYDIR}/bootcode-signed.bin" "${UPDATEDIR}/bootcode5.bin"
+        install -m 0644 "${DEPLOYDIR}/pieeprom-signed.bin" "${UPDATEDIR}/pieeprom.bin"
+        install -m 0644 "${DEPLOYDIR}/pieeprom.sig"        "${UPDATEDIR}/pieeprom.sig"
+        printf 'uart_2ndstage=1\n' > "${UPDATEDIR}/config.txt"
+        bbnote "Deployed rpiboot-update/ (BOOT_RAMDISK=1, no program_pubkey) to ${DEPLOYDIR}"
     fi
 }
 
