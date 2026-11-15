@@ -37,6 +37,11 @@ do_deploy[depends] += " \
     rpi-eeprom:do_deploy \
 "
 
+# Re-run do_deploy when the signing key file content changes.
+# Without this, swapping keys/bootloader-signing/ and rebuilding would reuse
+# the cached boot.img and boot.sig signed by the previous key.
+do_deploy[file-checksums] += "${BOOT_IMG_SIGN_KEYDIR}/${BOOT_IMG_SIGN_KEYNAME}.key:False"
+
 do_deploy() {
     if [ "${BOOT_IMG_SIGN_ENABLE}" != "1" ]; then
         bbdebug 1 "BOOT_IMG_SIGN_ENABLE not set: skipping boot.img creation"

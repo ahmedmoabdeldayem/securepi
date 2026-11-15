@@ -24,6 +24,9 @@ do_sign_eeprom[depends] += " \
     python3-pycryptodomex-native:do_populate_sysroot \
 "
 
+# Re-run when the signing key file content changes (key swap for OTP verification test).
+do_sign_eeprom[file-checksums] += "${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:False"
+
 # fakeroot is required so that install -m 0644 runs under pseudo.
 # Without it the signed files land in ${D} with the build user's uid,
 # and sstatesig.py (which runs outside pseudo) raises a KeyError when
@@ -107,6 +110,8 @@ inherit deploy
 do_deploy[depends] += " \
     python3-pycryptodomex-native:do_populate_sysroot \
 "
+
+do_deploy[file-checksums] += "${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:False"
 
 do_deploy() {
     # rpi-eeprom-digest uses xxd for hex encoding: provide the same shim as do_sign_eeprom.
