@@ -108,7 +108,10 @@ IMAGE_INSTALL:append = " tpm2-tools tpm2-abrmd libtss2-tcti-device kernel-module
 # TPM-backed LUKS auto-unlock service
 IMAGE_INSTALL:append = " tpm-luks-unlock"
 
-# ── Planned: Secure Boot ──
+# ── Secure boot ──
+# EEPROM signing + OTP provisioning tools
+IMAGE_INSTALL:append = " rpi-eeprom raspi-utils flashrom"
+# Planned: OP-TEE trusted execution environment (requires meta-arm in kas.yml)
 # IMAGE_INSTALL:append = " optee-client optee-os"
 
 # Planned: OTA updates + network hardening
@@ -122,6 +125,7 @@ IMAGE_INSTALL:append = " securepi-banner"
 # attr-native provides setfattr; do_image dependency makes it available here.
 do_image[depends] += "attr-native:do_populate_sysroot"
 do_image_wic[depends] += "tpm-overlay:do_deploy"
+do_image_wic[depends] += "securepi-bootimg:do_deploy"
 
 selinux_label_fstab() {
     if [ -f "${IMAGE_ROOTFS}/etc/fstab" ]; then

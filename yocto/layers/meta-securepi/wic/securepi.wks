@@ -4,6 +4,6 @@
 # rewriting /etc/fstab after image creation. Without this, wic replaces fstab
 # with a newly generated file that has no SELinux xattr, leaving it unlabeled_t.
 
-part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --size 100
+part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --size 300 --mkfs-extraopts "-F 32"
 part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096 --no-fstab-update
 part --ondisk mmcblk0 --align 4096 --fixed-size 256 --fstype=ext4 --label data
