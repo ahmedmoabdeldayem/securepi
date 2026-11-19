@@ -73,11 +73,24 @@ fakeroot do_sign_eeprom() {
 
         bbnote "Signing EEPROM firmware: $(basename ${FW})"
 
-        # Read current config from firmware binary and add SIGNED_BOOT=1 + program_pubkey=1.
-        # NOTE: do NOT use --bootcode here. That flag embeds the signed bootcode INTO the
-        # EEPROM SPI flash binary, changing the BOOTSYS section size and breaking the
-        # BCM2712 ROM's own Raspberry Pi signature verification. The customer-signed bootcode
-        # goes in boot.img (FAT partition) instead: see securepi-bootimg recipe.
+        # Counter-sign the EEPROM's embedded bootcode.bin with the customer key.
+        # Once OTP holds the customer key hash, the BCM2712 BootROM refuses to run any
+        # bootcode in SPI flash that is not signed by Raspberry Pi AND counter-signed by
+        # the customer: it halts silently before UART is even initialised.
+        # This mirrors usbboot/tools/update-pieeprom.sh -f (the path that produced the
+        # working 2026 image). The 2025 images are not A/B capable, so there is no
+        # separate bootsys section to sign.
+        BCDIR="${WORKDIR}/bootcode-$(basename ${FW%.bin})"
+        rm -rf "${BCDIR}" && mkdir -p "${BCDIR}"
+        (cd "${BCDIR}" && ${PYTHON} "${S}/rpi-eeprom-config" -x "${FW}")
+        ${PYTHON} "${S}/tools/rpi-sign-bootcode" \
+            -c 2712 \
+            -i "${BCDIR}/bootcode.bin" \
+            -k "${KEY}" \
+            -n 16 \
+            -v 0 \
+            -o "${BCDIR}/bootcode.bin.signed"
+
         # Write the full EEPROM config explicitly rather than patching firmware defaults.
         # Firmware package defaults (e.g. BOOT_ORDER=0xf461, NET_INSTALL_AT_POWER_ON=1)
         # are unsafe to inherit: we own every field here.
@@ -99,12 +112,13 @@ EEPROMCONF
         # Sign the config file: produces a .sig with SHA256 hash + RSA signature
         "${S}/rpi-eeprom-digest" -k "${KEY}" -i "${WORKDIR}/bootconf.txt" -o "${WORKDIR}/bootconf.sig"
 
-        # Create signed binary: config + pubkey embedded, no bootcode modification
+        # Create signed binary: config + pubkey + counter-signed bootcode embedded
         SIGNED_TMP="${WORKDIR}/$(basename ${FW%.bin})-signed.bin"
         ${PYTHON} "${S}/rpi-eeprom-config" \
             --config "${WORKDIR}/bootconf.txt" \
             --digest "${WORKDIR}/bootconf.sig" \
             --pubkey "${WORKDIR}/eeprom-pubkey.pem" \
+            --bootcode "${BCDIR}/bootcode.bin.signed" \
             --out "${SIGNED_TMP}" \
             "${FW}"
         install -m 0644 "${SIGNED_TMP}" "${FW%.bin}-signed.bin"
@@ -223,27 +237,15 @@ do_deploy() {
             bbnote "Initialising usbboot rpi-eeprom submodule for recovery bootcode"
             (cd "${USBBOOT}" && git submodule update --init rpi-eeprom 2>/dev/null) || true
         fi
-        # secure-boot-recovery5/bootcode5.bin is the customer-counter-signed recovery bootcode.
-        # Must be signed with -r flag (rpi-sign-bootcode on the base recovery.bin).
-        RECOVERY_BOOTCODE="${USBBOOT}/secure-boot-recovery5/bootcode5.bin"
-        if [ ! -f "${RECOVERY_BOOTCODE}" ] && [ -f "${RECOVERY_BIN}" ]; then
+        # Counter-sign the UNSIGNED upstream recovery.bin exactly once (update-pieeprom.sh -r).
+        # rpi-sign-bootcode appends a signature block, so signing an already-signed file
+        # (e.g. usbboot/secure-boot-recovery5/bootcode5.bin) stacks a second signature.
+        if [ -f "${RECOVERY_BIN}" ]; then
             KEY="${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key"
             if [ -f "${KEY}" ]; then
                 ${PYTHON} "${S}/tools/rpi-sign-bootcode" \
                     -c 2712 \
                     -i "${RECOVERY_BIN}" \
-                    -k "${KEY}" \
-                    -n 16 \
-                    -v 0 \
-                    -o "${RECOVERY_BOOTCODE}"
-            fi
-        fi
-        if [ -f "${RECOVERY_BOOTCODE}" ]; then
-            KEY="${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key"
-            if [ -f "${KEY}" ]; then
-                ${PYTHON} "${S}/tools/rpi-sign-bootcode" \
-                    -c 2712 \
-                    -i "${RECOVERY_BOOTCODE}" \
                     -k "${KEY}" \
                     -n 16 \
                     -v 0 \
@@ -253,11 +255,13 @@ do_deploy() {
                 bbwarn "Customer key not found: rpiboot-update/bootcode5.bin not signed"
             fi
         else
-            bbwarn "usbboot/secure-boot-recovery5/bootcode5.bin not found: run: kas checkout kas.yml"
+            bbwarn "usbboot recovery.bin not found, run kas checkout kas.yml"
         fi
 
         install -m 0644 "${DEPLOYDIR}/pieeprom-signed.bin" "${UPDATEDIR}/pieeprom.bin"
-        install -m 0644 "${DEPLOYDIR}/pieeprom.sig"        "${UPDATEDIR}/pieeprom.sig"
+        # rpiboot's recovery.bin only needs the plain sha256 + ts digest (same format as
+        # usbboot's update-pieeprom.sh). The RSA-signed pieeprom.sig is for self-update.
+        "${S}/rpi-eeprom-digest" -i "${UPDATEDIR}/pieeprom.bin" -o "${UPDATEDIR}/pieeprom.sig"
         printf 'uart_2ndstage=1\n' > "${UPDATEDIR}/config.txt"
 
         # NOTE: do NOT include bootfiles.bin in rpiboot-update/.
