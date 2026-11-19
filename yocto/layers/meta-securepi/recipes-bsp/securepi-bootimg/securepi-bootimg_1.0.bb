@@ -40,7 +40,8 @@ do_deploy[depends] += " \
 # Re-run do_deploy when the signing key file content changes.
 # Without this, swapping keys/bootloader-signing/ and rebuilding would reuse
 # the cached boot.img and boot.sig signed by the previous key.
-do_deploy[file-checksums] += "${BOOT_IMG_SIGN_KEYDIR}/${BOOT_IMG_SIGN_KEYNAME}.key:False"
+# Must be :True. Bitbake skips :False entries entirely (see rpi-eeprom_%.bbappend).
+do_deploy[file-checksums] += "${BOOT_IMG_SIGN_KEYDIR}/${BOOT_IMG_SIGN_KEYNAME}.key:True"
 
 do_deploy() {
     if [ "${BOOT_IMG_SIGN_ENABLE}" != "1" ]; then

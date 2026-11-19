@@ -25,7 +25,13 @@ do_sign_eeprom[depends] += " \
 "
 
 # Re-run when the signing key file content changes (key swap for OTP verification test).
-do_sign_eeprom[file-checksums] += "${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:False"
+# The suffix must be :True. Bitbake's checksum.py silently skips entries ending in :False
+# (it means "file did not exist at parse time"), which made key swaps invisible to sstate.
+# The .crt is tracked too: the embedded public key is extracted from it.
+do_sign_eeprom[file-checksums] += " \
+    ${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:True \
+    ${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.crt:True \
+"
 
 # fakeroot is required so that install -m 0644 runs under pseudo.
 # Without it the signed files land in ${D} with the build user's uid,
@@ -139,7 +145,7 @@ do_deploy[depends] += " \
     python3-pycryptodomex-native:do_populate_sysroot \
 "
 
-do_deploy[file-checksums] += "${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:False"
+do_deploy[file-checksums] += "${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:True"
 
 do_deploy() {
     # rpi-eeprom-digest uses xxd for hex encoding: provide the same shim as do_sign_eeprom.
