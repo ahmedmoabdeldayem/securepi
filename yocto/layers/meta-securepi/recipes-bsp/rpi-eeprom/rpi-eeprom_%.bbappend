@@ -24,6 +24,15 @@ do_sign_eeprom[depends] += " \
     python3-pycryptodomex-native:do_populate_sysroot \
 "
 
+# Re-run when the signing key file content changes (key swap for OTP verification test).
+# The suffix must be :True. Bitbake's checksum.py silently skips entries ending in :False
+# (it means "file did not exist at parse time"), which made key swaps invisible to sstate.
+# The .crt is tracked too: the embedded public key is extracted from it.
+do_sign_eeprom[file-checksums] += " \
+    ${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:True \
+    ${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.crt:True \
+"
+
 # fakeroot is required so that install -m 0644 runs under pseudo.
 # Without it the signed files land in ${D} with the build user's uid,
 # and sstatesig.py (which runs outside pseudo) raises a KeyError when
@@ -70,24 +79,52 @@ fakeroot do_sign_eeprom() {
 
         bbnote "Signing EEPROM firmware: $(basename ${FW})"
 
-        # Read current config from firmware binary and add SIGNED_BOOT=1 + program_pubkey=1.
-        # NOTE: do NOT use --bootcode here. That flag embeds the signed bootcode INTO the
-        # EEPROM SPI flash binary, changing the BOOTSYS section size and breaking the
-        # BCM2712 ROM's own Raspberry Pi signature verification. The customer-signed bootcode
-        # goes in boot.img (FAT partition) instead: see securepi-bootimg recipe.
-        ${PYTHON} "${S}/rpi-eeprom-config" "${FW}" > "${WORKDIR}/bootconf.txt"
-        grep -q "^SIGNED_BOOT" "${WORKDIR}/bootconf.txt" || echo "SIGNED_BOOT=1" >> "${WORKDIR}/bootconf.txt"
-        grep -q "^program_pubkey" "${WORKDIR}/bootconf.txt" || echo "program_pubkey=1" >> "${WORKDIR}/bootconf.txt"
+        # Counter-sign the EEPROM's embedded bootcode.bin with the customer key.
+        # Once OTP holds the customer key hash, the BCM2712 BootROM refuses to run any
+        # bootcode in SPI flash that is not signed by Raspberry Pi AND counter-signed by
+        # the customer: it halts silently before UART is even initialised.
+        # This mirrors usbboot/tools/update-pieeprom.sh -f (the path that produced the
+        # working 2026 image). The 2025 images are not A/B capable, so there is no
+        # separate bootsys section to sign.
+        BCDIR="${WORKDIR}/bootcode-$(basename ${FW%.bin})"
+        rm -rf "${BCDIR}" && mkdir -p "${BCDIR}"
+        (cd "${BCDIR}" && ${PYTHON} "${S}/rpi-eeprom-config" -x "${FW}")
+        ${PYTHON} "${S}/tools/rpi-sign-bootcode" \
+            -c 2712 \
+            -i "${BCDIR}/bootcode.bin" \
+            -k "${KEY}" \
+            -n 16 \
+            -v 0 \
+            -o "${BCDIR}/bootcode.bin.signed"
+
+        # Write the full EEPROM config explicitly rather than patching firmware defaults.
+        # Firmware package defaults (e.g. BOOT_ORDER=0xf461, NET_INSTALL_AT_POWER_ON=1)
+        # are unsafe to inherit: we own every field here.
+        #
+        # BOOT_RAMDISK=1: EEPROM always loads boot.img and verifies boot.sig against the
+        # OTP-locked customer key BEFORE mounting it as the boot filesystem. Without this
+        # the EEPROM falls back to individual FAT files and boot.img RSA check is non-fatal.
+        cat > "${WORKDIR}/bootconf.txt" << 'EEPROMCONF'
+[all]
+BOOT_UART=1
+POWER_OFF_ON_HALT=1
+BOOT_ORDER=0xf2461
+ENABLE_SELF_UPDATE=0
+SIGNED_BOOT=1
+program_pubkey=1
+BOOT_RAMDISK=1
+EEPROMCONF
 
         # Sign the config file: produces a .sig with SHA256 hash + RSA signature
         "${S}/rpi-eeprom-digest" -k "${KEY}" -i "${WORKDIR}/bootconf.txt" -o "${WORKDIR}/bootconf.sig"
 
-        # Create signed binary: config + pubkey embedded, no bootcode modification
+        # Create signed binary: config + pubkey + counter-signed bootcode embedded
         SIGNED_TMP="${WORKDIR}/$(basename ${FW%.bin})-signed.bin"
         ${PYTHON} "${S}/rpi-eeprom-config" \
             --config "${WORKDIR}/bootconf.txt" \
             --digest "${WORKDIR}/bootconf.sig" \
             --pubkey "${WORKDIR}/eeprom-pubkey.pem" \
+            --bootcode "${BCDIR}/bootcode.bin.signed" \
             --out "${SIGNED_TMP}" \
             "${FW}"
         install -m 0644 "${SIGNED_TMP}" "${FW%.bin}-signed.bin"
@@ -107,6 +144,8 @@ inherit deploy
 do_deploy[depends] += " \
     python3-pycryptodomex-native:do_populate_sysroot \
 "
+
+do_deploy[file-checksums] += "${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key:True"
 
 do_deploy() {
     # rpi-eeprom-digest uses xxd for hex encoding: provide the same shim as do_sign_eeprom.
@@ -177,6 +216,67 @@ do_deploy() {
                 fi
             fi
         fi
+    fi
+
+    # rpiboot-update/: used to reflash the EEPROM SPI flash after OTP is already burned.
+    # This updates the EEPROM config to include BOOT_RAMDISK=1 so the EEPROM enforces
+    # boot.img RSA verification on every boot.
+    # config.txt omits program_pubkey because the key hash is already in OTP.
+    # Usage: copy rpiboot-update/ to the machine connected to the Pi and run
+    # sudo rpiboot -d rpiboot-update
+    if [ -f "${DEPLOYDIR}/pieeprom-signed.bin" ] && \
+       [ -f "${DEPLOYDIR}/pieeprom.sig" ]; then
+
+        UPDATEDIR="${DEPLOYDIR}/rpiboot-update"
+        rm -rf "${UPDATEDIR}"
+        mkdir -p "${UPDATEDIR}"
+
+        # bootcode5.bin for rpiboot must be the RECOVERY bootcode (usbboot/secure-boot-recovery5/),
+        # NOT the EEPROM-embedded bootcode. These are different binaries:
+        # - EEPROM bootcode (76 KiB): embedded in pieeprom.bin, runs the EEPROM bootloader.
+        # - Recovery bootcode (96 KiB): served by rpiboot to BCM2712 BootROM in USB recovery
+        #   mode; boots the EEPROM update ramdisk. Must be signed with customer key after OTP burn.
+        # The recovery bootcode lives in usbboot/rpi-eeprom submodule. Init it if needed.
+        USBBOOT="${TOPDIR}/../yocto/layers/usbboot"
+        RECOVERY_BIN="${USBBOOT}/rpi-eeprom/firmware-2712/latest/recovery.bin"
+        if [ ! -f "${RECOVERY_BIN}" ]; then
+            bbnote "Initialising usbboot rpi-eeprom submodule for recovery bootcode"
+            (cd "${USBBOOT}" && git submodule update --init rpi-eeprom 2>/dev/null) || true
+        fi
+        # Counter-sign the UNSIGNED upstream recovery.bin exactly once (update-pieeprom.sh -r).
+        # rpi-sign-bootcode appends a signature block, so signing an already-signed file
+        # (e.g. usbboot/secure-boot-recovery5/bootcode5.bin) stacks a second signature.
+        if [ -f "${RECOVERY_BIN}" ]; then
+            KEY="${EEPROM_SIGN_KEYDIR}/${EEPROM_SIGN_KEYNAME}.key"
+            if [ -f "${KEY}" ]; then
+                ${PYTHON} "${S}/tools/rpi-sign-bootcode" \
+                    -c 2712 \
+                    -i "${RECOVERY_BIN}" \
+                    -k "${KEY}" \
+                    -n 16 \
+                    -v 0 \
+                    -o "${UPDATEDIR}/bootcode5.bin"
+                bbnote "Signed recovery bootcode5.bin for rpiboot-update/"
+            else
+                bbwarn "Customer key not found: rpiboot-update/bootcode5.bin not signed"
+            fi
+        else
+            bbwarn "usbboot recovery.bin not found, run kas checkout kas.yml"
+        fi
+
+        install -m 0644 "${DEPLOYDIR}/pieeprom-signed.bin" "${UPDATEDIR}/pieeprom.bin"
+        # rpiboot's recovery.bin only needs the plain sha256 + ts digest (same format as
+        # usbboot's update-pieeprom.sh). The RSA-signed pieeprom.sig is for self-update.
+        "${S}/rpi-eeprom-digest" -i "${UPDATEDIR}/pieeprom.bin" -o "${UPDATEDIR}/pieeprom.sig"
+        printf 'uart_2ndstage=1\n' > "${UPDATEDIR}/config.txt"
+
+        # NOTE: do NOT include bootfiles.bin in rpiboot-update/.
+        # When bootfiles.bin is present, rpiboot reads bootcode5.bin FROM THE ARCHIVE
+        # (the unsigned 68KB version inside bootfiles.bin) instead of the separate
+        # customer-signed bootcode5.bin file. The BCM2712 OTP lock then rejects it.
+        # EEPROM updates do not need the archive: the BCM2712 handles memory init
+        # internally.
+        bbnote "Deployed rpiboot-update/ (BOOT_RAMDISK=1) to ${DEPLOYDIR}"
     fi
 }
 
