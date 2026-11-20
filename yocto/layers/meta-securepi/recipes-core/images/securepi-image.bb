@@ -8,8 +8,9 @@ require recipes-core/images/core-image-minimal.bb
 # Falls back to /.autorelabel (first-boot relabel) if setfiles fails.
 inherit selinux-image
 
-# Use our own wks file so we can set --no-fstab-update on the rootfs partition.
-WKS_FILE = "securepi.wks"
+# Our own layout: rootfs partition is the dm-verity image (data + hash tree).
+# .wks.in so ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME} are expanded by bitbake.
+WKS_FILE = "securepi.wks.in"
 
 SUMMARY = "Hardened embedded Linux image for the Raspberry Pi 5"
 
