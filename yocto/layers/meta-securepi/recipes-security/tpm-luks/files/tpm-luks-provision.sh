@@ -9,6 +9,8 @@
 # Robustness notes:
 #   - close any stale mapping first, so mke2fs cannot write through it
 #   - no pipes around critical steps: each command's exit status is checked
+#     (exception: the key reaches cryptsetup on a pipe, see below. The pipe's
+#     status is cryptsetup's, so set -e still catches a cryptsetup failure)
 set -eu
 
 export TPM2TOOLS_TCTI="device:/dev/tpmrm0"
@@ -43,9 +45,12 @@ cryptsetup close securedata 2>/dev/null || true
 # 64 B fits the TPM's 128 B limit for sealed data objects.
 head -c 64 /dev/urandom > "$WORKDIR/key"
 
+# Key goes to cryptsetup on stdin, like tpm-luks-unlock does. cryptsetup runs in
+# the SELinux domain lvm_t, which may not open root's files in /tmp (user_tmp_t).
+# That fails with "Failed to open key file." and no AVC (dontaudit rule).
 echo "== LUKS2 format ${DEV}"
-cryptsetup luksFormat --type luks2 --batch-mode --key-file "$WORKDIR/key" "$DEV"
-cryptsetup open --key-file "$WORKDIR/key" "$DEV" securedata
+cat "$WORKDIR/key" | cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$DEV"
+cat "$WORKDIR/key" | cryptsetup open --key-file=- "$DEV" securedata
 mke2fs -q -t ext4 -L securedata /dev/mapper/securedata
 cryptsetup close securedata
 
