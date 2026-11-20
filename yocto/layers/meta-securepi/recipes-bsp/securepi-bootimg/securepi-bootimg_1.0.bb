@@ -35,7 +35,11 @@ do_deploy[depends] += " \
     securepi-u-boot-scr:do_deploy \
     tpm-overlay:do_deploy \
     rpi-eeprom:do_deploy \
+    ${@'${DM_VERITY_IMAGE}:do_image_${DM_VERITY_IMAGE_TYPE}' if d.getVar('DM_VERITY_IMAGE') else ''} \
 "
+
+# Block device holding the verity data + hash tree (rootfs partition in securepi.wks.in)
+VERITY_ROOT_DEV ?= "/dev/mmcblk0p2"
 
 # Re-run do_deploy when the signing key file content changes.
 # Without this, swapping keys/bootloader-signing/ and rebuilding would reuse
@@ -63,6 +67,40 @@ do_deploy() {
     # RPi firmware blobs and board config from rpi-bootfiles
     cp "${DEPLOY}/bootfiles/config.txt" "${STAGE}/"
     cp "${DEPLOY}/bootfiles/cmdline.txt" "${STAGE}/" 2>/dev/null || true
+
+    # dm-verity: replace the plain root= with a verity device the kernel creates
+    # itself (CONFIG_DM_INIT). The table carries the root hash, so the rootfs is
+    # now covered by this boot.img's signature and by its PCR 8 measurement.
+    if [ -n "${DM_VERITY_IMAGE}" ]; then
+        ENV="${STAGING_VERITY_DIR}/${DM_VERITY_IMAGE}.${DM_VERITY_IMAGE_TYPE}.verity.env"
+        [ -f "${ENV}" ] || bbfatal "dm-verity env ${ENV} missing: image not built with dm-verity-img?"
+        v() { sed -n "s/^$1=//p" "${ENV}"; }
+
+        DATA_BLOCKS=$(v DATA_BLOCKS)
+        DATA_BS=$(v DATA_BLOCK_SIZE)
+        HASH_BS=$(v HASH_BLOCK_SIZE)
+        DATA_SIZE=$(v DATA_SIZE)
+        ROOT_HASH=$(v ROOT_HASH)
+        SALT=$(v SALT)
+        for X in "$DATA_BLOCKS" "$DATA_BS" "$HASH_BS" "$DATA_SIZE" "$ROOT_HASH" "$SALT"; do
+            [ -n "$X" ] || bbfatal "incomplete dm-verity env ${ENV}"
+        done
+
+        SECTORS=$(expr ${DATA_BLOCKS} \* ${DATA_BS} / 512)
+        # The class runs veritysetup with --hash-offset=DATA_SIZE, which writes a
+        # one-block verity superblock there; the hash tree starts after it.
+        HASH_START=$(expr ${DATA_SIZE} / ${HASH_BS} + 1)
+        # No corruption-mode flag: a tampered block returns EIO to the reader
+        # (dmesg: "dm-verity ... data block N is corrupted").
+        TABLE="0 ${SECTORS} verity 1 ${VERITY_ROOT_DEV} ${VERITY_ROOT_DEV} ${DATA_BS} ${HASH_BS} ${DATA_BLOCKS} ${HASH_START} $(v HASH_ALGORITHM) ${ROOT_HASH} ${SALT}"
+
+        grep -q "root=${VERITY_ROOT_DEV}" "${STAGE}/cmdline.txt" || \
+            bbfatal "cmdline.txt has no root=${VERITY_ROOT_DEV} to replace"
+        sed -i "s#root=${VERITY_ROOT_DEV}#dm-mod.create=\"vroot,,,ro,${TABLE}\" dm-mod.waitfor=${VERITY_ROOT_DEV} root=/dev/dm-0 ro#" \
+            "${STAGE}/cmdline.txt"
+        bbnote "dm-verity root hash ${ROOT_HASH}"
+        bbnote "cmdline.txt: $(cat ${STAGE}/cmdline.txt)"
+    fi
     # Use customer-signed bootcode.bin if available (from rpi-eeprom:do_deploy).
     # program_pubkey=1 in the EEPROM config triggers OTP burning only after verifying
     # this signed bootcode on the FAT partition. Falls back to unsigned for non-secure builds.

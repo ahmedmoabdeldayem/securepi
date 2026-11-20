@@ -1,0 +1,15 @@
+# SecurePi SD card image layout for Raspberry Pi 5
+#
+# The root partition is a raw copy of <image>.ext4.verity: the ext4 filesystem
+# followed by its dm-verity hash tree (dm-verity-img class). wic must not build
+# its own filesystem from the rootfs here, because that would not match the root
+# hash in cmdline.txt. rawcopy also leaves /etc/fstab and its SELinux label
+# untouched.
+#
+# No --label/--fstype on the root partition: with rawcopy, wic applies a label by
+# rewriting the filesystem superblock (dosfslabel / tune2fs -L) AFTER the hash
+# tree was computed, which would make block 0 fail verity on first boot.
+
+part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --size 300 --mkfs-extraopts "-F 32"
+part / --source rawcopy --sourceparams="file=${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.ext4.verity" --ondisk mmcblk0 --align 4096
+part --ondisk mmcblk0 --align 4096 --fixed-size 256 --fstype=ext4 --label data
