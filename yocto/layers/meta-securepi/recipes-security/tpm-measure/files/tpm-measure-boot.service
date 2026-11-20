@@ -1,0 +1,16 @@
+[Unit]
+Description=Measure firmware-verified boot state into TPM PCR 8
+DefaultDependencies=no
+After=dev-tpmrm0.device tpm-reset.service
+Requires=dev-tpmrm0.device tpm-reset.service
+Before=tpm-luks-unlock.service local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/securepi/tpm-measure-boot.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=local-fs.target

@@ -24,7 +24,9 @@ tpm2_load -C "$WORKDIR/primary.ctx" \
     -c "$WORKDIR/sealed.ctx"
 
 tpm2_startauthsession -S "$WORKDIR/pol.ctx" --policy-session
-tpm2_policypcr -S "$WORKDIR/pol.ctx" -l sha256:0,4,7
+# PCR 8 is extended by tpm-measure-boot.service with the firmware-verified boot.img
+# digest, secure-boot flags and EEPROM version. PCRs 0-7 stay zero on RPi5.
+tpm2_policypcr -S "$WORKDIR/pol.ctx" -l sha256:8
 
 tpm2_unseal -c "$WORKDIR/sealed.ctx" -p "session:$WORKDIR/pol.ctx" \
     | cryptsetup luksOpen /dev/mmcblk0p3 securedata --key-file=-

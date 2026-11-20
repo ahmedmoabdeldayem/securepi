@@ -1,8 +1,8 @@
 [Unit]
 Description=TPM2 LUKS Auto-Unlock (securedata)
 DefaultDependencies=no
-After=dev-tpmrm0.device dev-mmcblk0p3.device
-Requires=dev-tpmrm0.device dev-mmcblk0p3.device
+After=dev-tpmrm0.device dev-mmcblk0p3.device tpm-measure-boot.service
+Requires=dev-tpmrm0.device dev-mmcblk0p3.device tpm-measure-boot.service
 Before=local-fs.target
 
 [Service]
