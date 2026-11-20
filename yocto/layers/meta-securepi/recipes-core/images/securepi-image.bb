@@ -104,8 +104,11 @@ ROOTFS_POSTPROCESS_COMMAND += "selinux_load_modules; "
 # ── Secure storage ──
 # LUKS + dm-verity tooling
 IMAGE_INSTALL:append = " cryptsetup e2fsprogs-mke2fs"
-# TPM operations
-IMAGE_INSTALL:append = " tpm2-tools tpm2-abrmd libtss2-tcti-device kernel-modules"
+# TPM 2.0 tooling. No tpm2-abrmd: the in-kernel resource manager
+# (/dev/tpmrm0) does the same job, so a root D-Bus daemon would only add attack
+# surface. PACKAGE_EXCLUDE fails the build if anything ever pulls it back in.
+IMAGE_INSTALL:append = " tpm2-tools libtss2-tcti-device kernel-modules"
+PACKAGE_EXCLUDE += "tpm2-abrmd"
 # TPM-backed LUKS auto-unlock service
 IMAGE_INSTALL:append = " tpm-luks-unlock"
 
@@ -137,3 +140,18 @@ selinux_label_fstab() {
     fi
 }
 IMAGE_PREPROCESS_COMMAND:append = " selinux_label_fstab; "
+
+# Session-wide environment, set by pam_env (login: "session pam_env.so readenv=1")
+# from /etc/environment, independent of the shell. /etc/profile.d does NOT work
+# here: meta-selinux replaces busybox applet links with "#!/usr/bin/busybox"
+# wrapper scripts, so login's "-sh" loses its dash and the shell is never a login
+# shell (never reads /etc/profile). sudo keeps both via env_keep (securepi-sudo).
+#   DM_DISABLE_UDEV: mdev never posts the dm udev semaphore, so cryptsetup and
+#     veritysetup would hang forever waiting for it.
+#   TPM2TOOLS_TCTI: tpm2-tools talk straight to the in-kernel resource manager.
+# Appended after install because /etc/environment is owned by pam-plugin-env.
+securepi_environment() {
+    printf '%s\n' 'DM_DISABLE_UDEV=1' 'TPM2TOOLS_TCTI=device:/dev/tpmrm0' \
+        >> ${IMAGE_ROOTFS}${sysconfdir}/environment
+}
+ROOTFS_POSTPROCESS_COMMAND += "securepi_environment; "

@@ -3,7 +3,7 @@ Description=Hardware-reset the TPM (GPIO 24) so PCRs start from zero
 DefaultDependencies=no
 After=dev-tpm0.device dev-tpmrm0.device systemd-udevd.service
 Requires=dev-tpm0.device dev-tpmrm0.device
-Before=tpm2-abrmd.service tpm-measure-boot.service local-fs.target
+Before=tpm-measure-boot.service local-fs.target
 
 [Service]
 Type=oneshot

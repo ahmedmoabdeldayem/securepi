@@ -1,4 +1,4 @@
-module securepi 1.16.0;
+module securepi 1.17.0;
 
 require {
     type kernel_t;
@@ -21,7 +21,7 @@ require {
     type bpf_t;
     type removable_device_t;
     type bin_t;
-    type tpm2_abrmd_t;
+    type local_login_t;
     type urandom_device_t;
     type tpm_device_t;
     type system_dbusd_t;
@@ -145,16 +145,6 @@ allow syslogd_t bin_t:file { read open execute map };
 allow securepi_logger_t init_t:fd use;
 
 ########################################
-# ── tpm2-abrmd ──
-#
-# The refpolicy defines tpm2_abrmd_t but is missing urandom and tpm device
-# access. tpm2-abrmd uses /dev/urandom to seed its internal PRNG before
-# opening the TPM. Both denials were confirmed via AVC log.
-########################################
-allow tpm2_abrmd_t urandom_device_t:chr_file { read open getattr };
-allow tpm2_abrmd_t tpm_device_t:chr_file { read open getattr write ioctl };
-
-########################################
 # D-Bus syslog socket
 #
 # dbus-daemon is denied write on /dev/log (syslogd_runtime_t:sock_file).
@@ -162,3 +152,7 @@ allow tpm2_abrmd_t tpm_device_t:chr_file { read open getattr write ioctl };
 # visibly slowing down serial login (PAM + systemd-logind use D-Bus).
 ########################################
 allow system_dbusd_t syslogd_runtime_t:sock_file write;
+
+# Same mislabelled socket (/run/systemd/journal/dev-log inherits syslogd_runtime_t
+# from its directory): login could not log the serial-console logins.
+allow local_login_t syslogd_runtime_t:sock_file write;
