@@ -1,1 +1,6 @@
 securepi ALL=(ALL) NOPASSWD: ALL
+
+# sudo wipes the caller's environment (env_reset), and with SELinux it starts the
+# shell through sesh, so `sudo -i` is not a login shell and never reads
+# /etc/profile. Carry over the two variables pam_env set from /etc/environment.
+Defaults env_keep += "TPM2TOOLS_TCTI DM_DISABLE_UDEV"
