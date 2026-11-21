@@ -34,8 +34,8 @@ repos:
   meta-securepi:
     path: yocto/layers/meta-securepi
 
-  # Development-only layer: originally for SSH access before Debug Probe arrived.
-  # Disabled: Debug Probe is now the access method. Re-enable only if needed.
+  # Optional dev-access layer (Wi-Fi + SSH + debug logging). Disabled: the
+  # production image is serial-console only. Fill in its placeholders first.
   # meta-securepi-dev:
   #   path: yocto/layers/meta-securepi-dev
 

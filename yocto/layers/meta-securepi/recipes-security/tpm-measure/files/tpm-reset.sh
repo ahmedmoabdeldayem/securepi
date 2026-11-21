@@ -31,7 +31,7 @@ echo "$DEV" > "$DRV/bind"
 # Wait for udev to recreate the device nodes, then make sure they carry
 # tpm_device_t: services are only allowed to open that label.
 udevadm settle --timeout=5
-for i in $(seq 50); do
+for _ in $(seq 50); do
     [ -c /dev/tpmrm0 ] && [ -c /dev/tpm0 ] && break
     sleep 0.1
 done
