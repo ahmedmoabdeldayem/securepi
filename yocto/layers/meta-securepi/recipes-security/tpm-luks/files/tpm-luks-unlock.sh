@@ -23,7 +23,13 @@ tpm2_load -C "$WORKDIR/primary.ctx" \
     -r "$WORKDIR/sealed.priv" \
     -c "$WORKDIR/sealed.ctx"
 
-tpm2_startauthsession -S "$WORKDIR/pol.ctx" --policy-session
+# -c primary.ctx makes this a SALTED session: the Pi sends the TPM a random salt
+# encrypted to the TPM's public key, so both derive a shared session key an SPI
+# bus sniffer can't compute. --enable-encrypt then makes the TPM AES-encrypt the
+# unseal RESPONSE (the 64-byte LUKS key) on the wire. Without this the key crosses
+# the SPI bus in clear text and a logic analyzer recovers it from one boot.
+tpm2_startauthsession -S "$WORKDIR/pol.ctx" --policy-session -c "$WORKDIR/primary.ctx"
+tpm2_sessionconfig "$WORKDIR/pol.ctx" --enable-encrypt
 # PCR 8 is extended by tpm-measure-boot.service with the firmware-verified boot.img
 # digest, secure-boot flags and EEPROM version. PCRs 0-7 stay zero on RPi5.
 tpm2_policypcr -S "$WORKDIR/pol.ctx" -l sha256:8

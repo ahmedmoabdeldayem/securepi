@@ -64,13 +64,28 @@ tpm2_startauthsession -S "$WORKDIR/trial.ctx"
 tpm2_policypcr -S "$WORKDIR/trial.ctx" -l "$PCRS" -L "$WORKDIR/pcr.policy"
 tpm2_flushcontext "$WORKDIR/trial.ctx"
 
+# Salted DECRYPT session: encrypts the sensitive key as it travels TO the TPM
+# (tpm2_create's inSensitive, carrying -i key). Mirror of the encrypt session in
+# tpm-luks-unlock. Without it the key is sniffable on the SPI bus at provisioning
+# time. The owner primary (empty auth) is the salt key; -P passes it as the parent
+# auth session so tpm2-tools applies parameter encryption to the command.
+# MUST be --hmac-session: tpm2_startauthsession with no type flag defaults to a
+# TRIAL session (a policy dry-run), and a trial session cannot carry the
+# encrypt/decrypt attribute ("Trial sessions cannot be additionally used as
+# encrypt/decrypt session"). An HMAC session is a real session, still salted by
+# -c primary.ctx, and is allowed to be a decrypt session.
+tpm2_startauthsession --hmac-session -S "$WORKDIR/enc.ctx" -c "$WORKDIR/primary.ctx"
+tpm2_sessionconfig "$WORKDIR/enc.ctx" --enable-decrypt
+
 # Explicit attributes: no userwithauth, so the policy is the ONLY way to unseal
 # (with userwithauth set, an empty password would bypass the PCR check).
 tpm2_create -C "$WORKDIR/primary.ctx" \
+    -P "session:$WORKDIR/enc.ctx" \
     -L "$WORKDIR/pcr.policy" \
     -a "fixedtpm|fixedparent" \
     -i "$WORKDIR/key" \
     -u "$WORKDIR/sealed.pub" -r "$WORKDIR/sealed.priv"
+tpm2_flushcontext "$WORKDIR/enc.ctx"
 
 echo "== Store sealed blob in TPM NVRAM"
 for NV in "$NV_PUB" "$NV_PRIV"; do
@@ -83,7 +98,10 @@ tpm2_nvwrite  -C o -i "$WORKDIR/sealed.priv" "$NV_PRIV"
 
 echo "== Verify: unseal through the PCR policy and compare"
 tpm2_load -C "$WORKDIR/primary.ctx" -u "$WORKDIR/sealed.pub" -r "$WORKDIR/sealed.priv" -c "$WORKDIR/sealed.ctx"
-tpm2_startauthsession -S "$WORKDIR/pol.ctx" --policy-session
+# Same salted + encrypt session the boot-time unlock uses, so the verify exercises
+# the exact path that runs on the device.
+tpm2_startauthsession -S "$WORKDIR/pol.ctx" --policy-session -c "$WORKDIR/primary.ctx"
+tpm2_sessionconfig "$WORKDIR/pol.ctx" --enable-encrypt
 tpm2_policypcr -S "$WORKDIR/pol.ctx" -l "$PCRS"
 tpm2_unseal -c "$WORKDIR/sealed.ctx" -p "session:$WORKDIR/pol.ctx" -o "$WORKDIR/check"
 tpm2_flushcontext "$WORKDIR/pol.ctx"
