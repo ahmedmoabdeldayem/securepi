@@ -22,6 +22,11 @@ IMAGE_INSTALL:append = " sysctl-hardened sudo"
 IMAGE_FEATURES:append = " read-only-rootfs"
 
 inherit extrausers
+# Default credential: the hash below is the shared default console password (123),
+# so the image has a usable serial console login out of the box. Every build that
+# uses it has the same password. Replace it with your own hash (`openssl passwd -6`)
+# before any real use. The root filesystem is read-only, so the password is fixed
+# at build time. See SECURITY.md.
 EXTRA_USERS_PARAMS = "useradd -M -d /home/securepi -s /bin/sh -u 1000 \
     -p '\$6\$uU2.uEWhNmTHC/LL\$DsFzAJ/oPkwV7whTYe5boD0544Nou32My8sBsWNEVylrF1prt9Xy5jkqgcBMCecI85mVm/c9WRbndPQ7rS1Np.' \
     securepi;"

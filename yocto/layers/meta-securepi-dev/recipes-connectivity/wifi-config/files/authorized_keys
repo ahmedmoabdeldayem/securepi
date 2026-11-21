@@ -1,1 +1,5 @@
+# Replace the line below with YOUR OWN SSH public key before enabling the
+# optional dev-access layer (meta-securepi-dev). Generate one with:
+#   ssh-keygen -t ed25519 -C "you@example.com"
+# then paste the contents of ~/.ssh/id_ed25519.pub here.
 ssh-ed25519 REPLACE_WITH_YOUR_SSH_PUBKEY device-admin@example.com

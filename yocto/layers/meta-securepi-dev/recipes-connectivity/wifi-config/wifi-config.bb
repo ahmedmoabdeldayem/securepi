@@ -17,6 +17,8 @@ S = "${WORKDIR}"
 inherit useradd
 
 USERADD_PACKAGES = "${PN}"
+# SECURITY: DEFAULT CREDENTIAL (shared default hash; same as securepi-image.bb).
+# Replace it with your own before deploying. See SECURITY.md.
 USERADD_PARAM:${PN} = "-M -d /home/securepi -s /bin/sh -u 1000 -p '\$6\$uU2.uEWhNmTHC/LL\$DsFzAJ/oPkwV7whTYe5boD0544Nou32My8sBsWNEVylrF1prt9Xy5jkqgcBMCecI85mVm/c9WRbndPQ7rS1Np.' securepi"
 
 RDEPENDS:${PN} = "wpa-supplicant linux-firmware-rpidistro-bcm43455"
