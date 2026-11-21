@@ -306,5 +306,8 @@ follow Scarthgap conventions, put kernel options in the config fragment and SELi
 
 Security problems: see [SECURITY.md](SECURITY.md).
 
-Licensed under the [MIT License](LICENSE). Images built with this project also contain third-party software under
-its own licenses (see the note in LICENSE).
+The project's own files (the meta-securepi layer and the documentation) are licensed under the
+[MIT License](LICENSE). Images built with this project also contain third-party software (the Linux kernel, U-Boot,
+BusyBox, systemd, cryptsetup, the tpm2 stack and other Yocto components) under their own licenses, mostly GPL-2.0,
+GPL-3.0, LGPL and permissive licenses. The license manifest under `build/tmp/deploy/licenses/` lists them for each
+build.

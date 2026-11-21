@@ -19,14 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-NOTE: This license covers the SecurePi project's own files (the meta-securepi
-layer and the documentation). The images built with this project also
-include third-party software (the Linux kernel, U-Boot, BusyBox, systemd,
-cryptsetup, the tpm2 stack, and other Yocto-provided components) under their
-own licenses: predominantly GPL-2.0/GPL-3.0, LGPL, and permissive licenses.
-Those licenses govern the corresponding components in any image you build or
-distribute. Use `bitbake securepi-image -c populate_lic` / the image license
-manifest to produce the full per-package license list for a given build.
