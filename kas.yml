@@ -34,11 +34,6 @@ repos:
   meta-securepi:
     path: yocto/layers/meta-securepi
 
-  # Optional dev-access layer (Wi-Fi + SSH + debug logging). Disabled: the
-  # production image is serial-console only. Fill in its placeholders first.
-  # meta-securepi-dev:
-  #   path: yocto/layers/meta-securepi-dev
-
 # meta-openembedded
 # Provides: extended package set required by meta-selinux and meta-security
   meta-openembedded:
