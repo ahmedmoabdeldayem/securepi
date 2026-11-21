@@ -1,8 +1,8 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-# Drop-in to make systemd-rfkill start after volatile-binds has made
-# /var/lib writable. Without this, rfkill races volatile-binds at boot
-# and fails to create /var/lib/systemd/rfkill/.
+# Drop-in to make systemd-rfkill start after var-volatile-lib.service (from
+# volatile-binds) has made /var/lib writable. Without this, rfkill races the
+# bind mount at boot and fails to create /var/lib/systemd/rfkill/.
 SRC_URI:append = " file://rfkill-after-volatile-binds.conf"
 
 do_install:append() {
